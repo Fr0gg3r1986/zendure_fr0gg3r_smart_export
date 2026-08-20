@@ -1,6 +1,6 @@
 # Zendure Fr0gg3r Smart Export
 
-Price-aware evening/vacation export control for Zendure batteries in Home Assistant, built as a companion package on top of [Gielz1986's Zendure-HA-zenSDK](https://github.com/Gielz1986/Zendure-HA-zenSDK) integration.
+Price-aware evening/vacation export control for Zendure batteries in Home Assistant, built as a companion package on top of [Gielz1986's Zendure-HA-zenSDK](https://github.com/Gielz1986/Zendure-HA-zenSDK) integration, with optional support for multi-unit setups via [gast777's Zendure-zenSDK-proxy](https://github.com/gast777/Zendure-zenSDK-proxy).
 
 Automates grid export during peak Nordpool price windows, with configurable SOC reserve, vacation mode, aircon-load blocking, arm/disarm notifications, and a full dashboard — including a fix for combined-SOC accuracy on multi-unit setups.
 
