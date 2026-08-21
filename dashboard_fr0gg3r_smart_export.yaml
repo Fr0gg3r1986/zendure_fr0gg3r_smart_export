@@ -7,6 +7,16 @@
 # for multi-unit setups, gast777's proxy
 # (https://github.com/gast777/Zendure-zenSDK-proxy).
 #
+# DISCLAIMER: This is a personal, hobbyist project (I am not a professional
+# programmer/developer), published for my own Zendure setup and shared
+# publicly in case it's useful to others. I take full responsibility for the
+# risk to my own hardware in running it. This project is NOT affiliated with,
+# endorsed by, or supported by Zendure, Gielz1986, or gast777. If you choose
+# to use this on your own system, that is entirely at YOUR OWN RISK. Provided
+# "AS IS", with NO WARRANTY and NO LIABILITY accepted for hardware
+# malfunction, damage, data loss, financial loss, or any other harm. Full
+# legal terms: see LICENSE (MIT) in the repo.
+#
 # Changelog:
 #   2.15.0
 #     - Added a Forecast section to the Solar view: combined + per-plane
