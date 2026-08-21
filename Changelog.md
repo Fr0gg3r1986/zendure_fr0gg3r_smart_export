@@ -6,6 +6,10 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.17.0 (2026-08-21)
+- Added grid-spike detection/resume timestamps. New `binary_sensor.zendure_grid_spike_raw` mirrors the threshold check with no `delay_on`/`delay_off`, purely so the exact moment power drops back under threshold is knowable. `sensor.zendure_grid_spike_resume_estimate` (timestamp) computes when export should resume, using that raw sensor's `last_changed` + the clear-window setting — only populated once the raw reading has actually cleared (still "unknown" while genuinely spiking, since the cooldown timer hasn't started yet).
+- `input_datetime.zendure_grid_spike_last_detected` + a new automation (`smart_export_track_grid_spike_detection`) record when each spike was first detected, so it's visible even after the block clears.
+
 ### 2.16.1 (2026-08-21)
 - **Bug fix:** `binary_sensor.zendure_grid_spike_detected` failed config validation and was never created ("Unknown entity" on the dashboard). Cause: `delay_on`/`delay_off` were written as a nested dict with a template inside it (e.g. `delay_on: {seconds: "{{ ... }}"}`) — Home Assistant's schema only accepts a fixed literal duration OR a single flat template string evaluating to seconds, not a dict wrapping a template. Fixed to use the flat template form; `delay_off` now converts the minutes-based helper to seconds within the template.
 
@@ -39,6 +43,15 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 ---
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
+
+### 2.22.0
+- Added "Last Peak Detected" and "Export Resumes At" fields, plus a 24h Logbook history card, to Tablet Overview right after the Grid Power vs Spike Threshold chart. Companion to package v2.17.0's grid-spike detection/resume timestamp tracking.
+
+### 2.21.0
+- Added a "Grid Power vs Spike Threshold (2h)" chart to Tablet Overview, right after the blocking-factor tiles: grid power as a filled area, spike threshold as a red stepline, so a spike crossing the threshold is immediately visible. Short 2h window chosen since spikes are short-duration events that'd be invisible on a longer span. Companion to package v2.16.1's grid-spike detection.
+
+### 2.20.0
+- Added a "Tablet Overview" view: a large, glanceable single-screen status board — Real SOC gauge, charging mode, per-unit SOC/power, export active/armed/current mode tiles, top-price status, all 3 blocking-factor tiles (aircon/low-solar/grid-spike) side by side, and grid/solar/home-use at a glance. Designed for a wall-mounted tablet in kiosk mode pointed at this view's path.
 
 ### 2.19.0
 - Added a "Grid Spike Blocking" tile to Export Control, and a new "Grid Spike Settings" section on Export Settings: current grid power, spike threshold, entry delay, clear window, live block status. Companion to package v2.16.0's grid-spike export block.
