@@ -18,6 +18,11 @@
 # legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.17.0
+#     - Added a "Forecast Accuracy" section to the Solar view: per-inverter
+#       actual-vs-predicted comparison (yesterday), a combined accuracy %,
+#       and a 30-day actual-vs-predicted histogram. Companion to package
+#       v2.14.0's daily solar accuracy snapshot automation.
 #   2.16.0
 #     - Dashboard's P1 meter cards now reference sensor.smart_export_p1_*
 #       wrapper sensors (from package v2.13.0) instead of a raw HomeWizard
@@ -200,7 +205,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.16.0 · by Fr0gg3r1986
+              Dashboard v2.17.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -1082,6 +1087,80 @@ views:
                 name: Tomorrow
               - entity: sensor.power_highest_peak_time_today_4
                 name: Peak Time Today
+      - type: grid
+        cards:
+          - type: heading
+            heading: Forecast Accuracy
+            heading_style: title
+            icon: mdi:target
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="info">Snapshotted daily at 23:55 —
+              compares each plane's actual yield against what Forecast.Solar
+              predicted for that same day. Updates once per day; "today"
+              only becomes available after the first snapshot runs.</ha-alert>
+            text_only: true
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.smart_export_solar_actual_total_yesterday
+                name: Actual Total
+                icon: mdi:solar-power-variant
+              - entity: sensor.smart_export_solar_predicted_total_yesterday
+                name: Predicted Total
+                icon: mdi:weather-partly-cloudy
+              - entity: sensor.smart_export_solar_forecast_accuracy
+                name: Accuracy
+                icon: mdi:target
+          - type: entities
+            title: Per Inverter (Yesterday)
+            entities:
+              - entity: input_number.smart_export_solar_actual_huawei_kwh
+                name: Huawei Actual
+              - entity: input_number.smart_export_solar_predicted_huawei_kwh
+                name: Huawei Predicted
+              - entity: input_number.smart_export_solar_actual_x1_kwh
+                name: X1 Actual
+              - entity: input_number.smart_export_solar_predicted_x1_kwh
+                name: X1 Predicted
+              - entity: input_number.smart_export_solar_actual_x2_kwh
+                name: X2 Actual
+              - entity: input_number.smart_export_solar_predicted_x2_kwh
+                name: X2 Predicted
+          - type: custom:apexcharts-card
+            graph_span: 30d
+            header:
+              show: true
+              title: Actual vs Predicted — Total (30 days)
+              show_states: false
+            apex_config:
+              chart:
+                height: 250px
+              plotOptions:
+                bar:
+                  columnWidth: 70%
+              legend:
+                show: true
+              xaxis:
+                type: datetime
+                labels:
+                  format: dd/MM
+              tooltip:
+                x:
+                  format: dd/MM
+            series:
+              - entity: sensor.smart_export_solar_actual_total_yesterday
+                name: Actual
+                type: column
+                color: "#01a180"
+                float_precision: 2
+              - entity: sensor.smart_export_solar_predicted_total_yesterday
+                name: Predicted
+                type: column
+                color: "#a2a2a3"
+                float_precision: 2
       - type: grid
         cards:
           - type: heading
