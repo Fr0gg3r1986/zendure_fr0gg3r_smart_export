@@ -12,6 +12,15 @@ Full version history: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
+## Disclaimer
+
+- **This project is not affiliated with, endorsed by, or supported by Zendure, Gielz1986, or gast777.** It's an independent, unofficial add-on built by a user, for personal use, and shared publicly as-is.
+- **Use entirely at your own risk.** This code reads from and writes to real battery hardware, and makes automated decisions about grid export based on price and forecast data. Bugs, misconfiguration, upstream API/firmware changes, or incorrect assumptions in this code could result in unexpected battery behavior, financial cost from incorrect export/import decisions, or hardware wear.
+- **No warranty, no liability.** This software is provided "as is," with no guarantee it is fit for any particular purpose. The author accepts **no responsibility or liability whatsoever** for any hardware malfunction, damage, data loss, financial loss, or any other direct or indirect harm arising from installing, configuring, or using this code — see the [LICENSE](LICENSE) for the full legal terms.
+- **Test carefully before trusting it unattended.** Review the automations, understand what they do, and monitor behavior closely — especially reserve/SOC-floor logic and anything that controls charge/discharge — before leaving it to run unsupervised.
+
+---
+
 ## What this is (and isn't)
 
 This is **not** a replacement for Gielz1986's integration — it's an add-on package that sits alongside it. It never edits or modifies his files; it only reads and controls entities he creates, by entity ID. This means:
