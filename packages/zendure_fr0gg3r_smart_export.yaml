@@ -1,10 +1,23 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.11.0 (2026-08-20)
+# Version: 2.12.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
 # Changelog:
+#   2.12.0 (2026-08-21)
+#     - Added a low-solar-tomorrow export block: sensor.zendure_solar_forecast_tomorrow
+#       sums Forecast.Solar's per-plane "tomorrow" estimate across all 3 real
+#       solar systems (Huawei south, SolaX X1 east, SolaX X2 west).
+#       binary_sensor.zendure_low_solar_tomorrow trips when that sum falls
+#       below input_number.zendure_low_solar_threshold_kwh (default 5 kWh).
+#       When tripped, evening export is blocked the same way the aircon
+#       reserve block already works — preventing the battery being drained
+#       by price-chasing export on an evening before a low-sun day, when it
+#       may not fully recharge the next day. Overridable per-day via
+#       input_boolean.zendure_ignore_low_solar_forecast.
+#     - Requires the Forecast.Solar integration (or compatible) configured
+#       per solar plane. See Dependencies section below.
 #   2.11.0 (2026-08-20)
 #     - Added sensor.zendure_true_total_state_of_charge — a capacity-weighted
 #       SOC across the two proxy units (5.28 kWh + 2.4 kWh), correcting
@@ -37,6 +50,16 @@
 #   https://github.com/gast777/Zendure-zenSDK-proxy
 #   Needed if you're running more than one Zendure unit behind Gielz1986's
 #   integration. Single-unit setups don't need this.
+#
+# REQUIRED for the low-solar-tomorrow export block:
+#   The built-in Forecast.Solar integration, one instance per solar plane
+#   (Settings -> Devices & Services -> Add Integration -> Forecast.Solar).
+#   This package expects sensor.energy_production_tomorrow (+ _2, _3, ... for
+#   additional planes) to exist. Update the entity IDs in the
+#   "Zendure Solar Forecast Tomorrow" template sensor below to match your
+#   actual instances if they differ. If you don't want this feature, just
+#   leave input_number.zendure_low_solar_threshold_kwh at 0 — the block will
+#   never trigger.
 #
 # KNOWN ISSUE — combined SOC is not capacity-weighted when using the proxy:
 #   With multiple units of different capacities (e.g. one unit with a
@@ -152,6 +175,15 @@ input_number:
     initial: 20
     icon: mdi:clock-time-eight-outline
 
+  zendure_low_solar_threshold_kwh:
+    name: Zendure - Low Solar Tomorrow Threshold
+    min: 0
+    max: 30
+    step: 0.5
+    initial: 5
+    unit_of_measurement: "kWh"
+    icon: mdi:weather-cloudy-alert
+
 input_boolean:
   zendure_export_armed:
     name: Zendure - Allow price-based export (I'm away)
@@ -168,6 +200,10 @@ input_boolean:
   zendure_prompt_approved_today:
     name: Zendure - Prompt Approved Today
     icon: mdi:check-circle-outline
+
+  zendure_ignore_low_solar_forecast:
+    name: Zendure - Ignore Low Solar Forecast Today
+    icon: mdi:weather-sunny-alert
 
 template:
   - trigger:
@@ -238,19 +274,44 @@ template:
           {{ states(e) if e not in ['', 'unknown', 'unavailable'] else 'not set' }}
 
   - binary_sensor:
+      - name: "Zendure Low Solar Tomorrow"
+        icon: mdi:weather-cloudy-alert
+        device_class: problem
+        state: >
+          {% set forecast = states('sensor.zendure_solar_forecast_tomorrow') | float(0) %}
+          {% set threshold = states('input_number.zendure_low_solar_threshold_kwh') | float(5) %}
+          {{ forecast < threshold }}
+
       - name: "Zendure Export Active"
         icon: mdi:transmission-tower-export
         device_class: running
         state: >
           {% set armed = is_state('input_boolean.zendure_export_armed', 'on') %}
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
+          {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
+                                    and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
           {% set mode_ok = states('input_select.zendure_operation_mode') == 'Quick Discharge' %}
           {% set soc_ok = states('sensor.zendure_true_total_state_of_charge') | float(0) >
                           states('input_number.zendure_night_reserve_soc') | float(0) %}
           {% set peak_hour = is_state('sensor.dynamic_highest_price_period', 'Yes') %}
-          {{ armed and not aircon_block and mode_ok and soc_ok and peak_hour }}
+          {{ armed and not aircon_block and not low_solar_block and mode_ok and soc_ok and peak_hour }}
 
   - sensor:
+      - name: "Zendure Solar Forecast Tomorrow"
+        icon: mdi:solar-power-variant
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: >
+          {# Sums Forecast.Solar's per-plane tomorrow estimate across all 3
+             real solar systems (Huawei south, SolaX X1 east, SolaX X2 west).
+             Update the entity IDs below if your Forecast.Solar instances
+             change. #}
+          {% set huawei = states('sensor.energy_production_tomorrow') | float(0) %}
+          {% set x1 = states('sensor.energy_production_tomorrow_2') | float(0) %}
+          {% set x2 = states('sensor.energy_production_tomorrow_3') | float(0) %}
+          {{ (huawei + x1 + x2) | round(2) }}
+
       - name: "Zendure Export Reason"
         icon: mdi:information-outline
         state: >
@@ -258,6 +319,8 @@ template:
           {% set vacation = is_state('input_boolean.zendure_vacation_mode', 'on') %}
           {% set prompt_approved = is_state('input_boolean.zendure_prompt_approved_today', 'on') %}
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
+          {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
+                                    and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
           {% set custom_time = states('input_text.zendure_custom_not_before_time_today') %}
           {% set has_custom = custom_time not in ['', 'unknown', 'unavailable'] %}
           {% if has_custom %}
@@ -277,6 +340,8 @@ template:
             Not armed — export switch is off
           {% elif aircon_block %}
             Blocked — an airco is cooling, or a room is too hot while you're home
+          {% elif low_solar_block %}
+            Blocked — tomorrow's solar forecast ({{ states('sensor.zendure_solar_forecast_tomorrow') }} kWh) is below threshold
           {% elif soc <= reserve %}
             Blocked — battery at {{ soc }}%, at/below reserve floor of {{ reserve }}%
           {% elif not vacation and not prompt_approved and not not_waiting %}
@@ -303,6 +368,8 @@ template:
           {% set armed = is_state('input_boolean.zendure_export_armed', 'on') %}
           {% set vacation = is_state('input_boolean.zendure_vacation_mode', 'on') %}
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
+          {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
+                                    and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
           {% set current_mode = states('input_select.zendure_operation_mode') %}
           {% set target_mode = 'Quick Discharge' %}
           {% set revert_mode = states('input_select.zendure_revert_mode') %}
@@ -323,6 +390,8 @@ template:
             Not armed — no flip scheduled
           {% elif aircon_block %}
             Blocked by aircon — resumes when clear
+          {% elif low_solar_block %}
+            Blocked by low solar forecast — resumes when clear or overridden
           {% elif current_mode == target_mode %}
             {% if data %}
               {% set toekomst = data
@@ -457,7 +526,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.11.0"
+        state: "2.12.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -633,15 +702,20 @@ automation:
     description: >-
       Directly controls Quick Discharge based on Gielz1986's own price-ranking
       flag (sensor.dynamic_highest_price_period) instead of delegating to his
-      Dynamic Trading mode branch. Entry requires: armed, no aircon block,
-      past the configured start hour (unless on vacation), above reserve, and
-      the current hour flagged as a top price period. Reverts to the fixed
-      "Revert To Mode" the moment any of those stop being true.
+      Dynamic Trading mode branch. Entry requires: armed, no aircon block, no
+      low-solar-tomorrow block, past the configured start hour (unless on
+      vacation), above reserve, and the current hour flagged as a top price
+      period. Reverts to the fixed "Revert To Mode" the moment any of those
+      stop being true.
     trigger:
       - platform: state
         entity_id: input_boolean.zendure_export_armed
       - platform: state
         entity_id: binary_sensor.zendure_aircon_reserve_needed
+      - platform: state
+        entity_id: binary_sensor.zendure_low_solar_tomorrow
+      - platform: state
+        entity_id: input_boolean.zendure_ignore_low_solar_forecast
       - platform: state
         entity_id: sensor.dynamic_highest_price_period
       - platform: time_pattern
@@ -655,6 +729,10 @@ automation:
               - condition: state
                 entity_id: binary_sensor.zendure_aircon_reserve_needed
                 state: "off"
+              - condition: template
+                value_template: >-
+                  {{ not is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
+                     or is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') }}
               - condition: template
                 value_template: >-
                   {{ is_state('input_boolean.zendure_vacation_mode', 'on')
@@ -691,6 +769,10 @@ automation:
                  and (
                    not is_state('input_boolean.zendure_export_armed', 'on')
                    or is_state('binary_sensor.zendure_aircon_reserve_needed', 'on')
+                   or (
+                     is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
+                     and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on')
+                   )
                    or (
                      not is_state('input_boolean.zendure_vacation_mode', 'on')
                      and not is_state('input_boolean.zendure_prompt_approved_today', 'on')
