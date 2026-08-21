@@ -12,12 +12,19 @@
 # publicly in case it's useful to others. I take full responsibility for the
 # risk to my own hardware in running it. This project is NOT affiliated with,
 # endorsed by, or supported by Zendure, Gielz1986, or gast777. If you choose
-# to use this on your own system, that is entirely at YOUR OWN RISK. Provided
-# "AS IS", with NO WARRANTY and NO LIABILITY accepted for hardware
-# malfunction, damage, data loss, financial loss, or any other harm. Full
-# legal terms: see LICENSE (MIT) in the repo.
+# to use this on your own system, that is entirely at YOUR OWN RISK. THIS
+# SOFTWARE CAN DAMAGE YOUR HARDWARE if misconfigured or misunderstood — use
+# is only appropriate for people with real programming/Home Assistant
+# knowledge AND knowledge of their own battery hardware's safe operating
+# limits. Provided "AS IS", with NO WARRANTY and NO LIABILITY accepted for
+# hardware malfunction, damage, data loss, financial loss, or any other
+# harm. BY USING OR COPYING THIS CODE YOU ACCEPT FULL RESPONSIBILITY for the
+# outcome on your own system. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.18.0
+#     - Added a "Disclaimer" view: the full README disclaimer rendered as
+#       alert cards directly in the dashboard UI, not just in YAML comments.
 #   2.17.0
 #     - Added a "Forecast Accuracy" section to the Solar view: per-inverter
 #       actual-vs-predicted comparison (yesterday), a combined accuracy %,
@@ -205,7 +212,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.17.0 · by Fr0gg3r1986
+              Dashboard v2.18.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -1280,3 +1287,99 @@ views:
                 name: L2
               - entity: sensor.smart_export_p1_active_current_l3
                 name: L3
+  - type: sections
+    max_columns: 2
+    title: Disclaimer
+    path: disclaimer
+    icon: mdi:alert-circle-outline
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Zendure Fr0gg3r Smart Export — Disclaimer
+            heading_style: title
+            icon: mdi:alert-circle-outline
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="warning">This is a personal repository.
+              I built and maintain this to manage my own Zendure setup, and
+              I take full responsibility for the risk to my own hardware in
+              running it. I'm publishing it publicly in case it's useful to
+              others, not as a supported product.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="warning">I am not a professional
+              programmer or developer. This is hobbyist code, written and
+              refined through trial and error on my own system. It may
+              contain bugs, bad practices, or assumptions that don't hold on
+              other setups.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="error">This software can damage your
+              hardware. It sends real commands to real battery hardware and
+              makes automated charge/discharge/export decisions.
+              Misconfiguration, bugs, or misunderstanding what an automation
+              does could result in battery damage, accelerated wear, or
+              other hardware harm.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="error">Intended for users with relevant
+              technical knowledge. Using this assumes you understand Home
+              Assistant YAML, automations, and templating well enough to
+              read and verify what this code actually does before running
+              it — and that you have enough understanding of your own
+              battery hardware (safe operating limits, SOC floors,
+              manufacturer guidance) to judge whether these automations are
+              appropriate for your setup. If you don't have that background,
+              either don't use this, or have someone who does review it with
+              you first.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="info">This project is NOT affiliated
+              with, endorsed by, or supported by Zendure, Gielz1986, or
+              gast777. It's an independent, unofficial add-on built by a
+              user, for personal use, and shared publicly as-is.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="warning">If you choose to use this on
+              your own system, that's entirely at your own risk. I take no
+              responsibility for how it performs on hardware, integrations,
+              or configurations other than my own.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="error">No warranty, no liability. This
+              software is provided "as is," with no guarantee it is fit for
+              any particular purpose. The author accepts no responsibility
+              or liability whatsoever for any hardware malfunction, damage,
+              data loss, financial loss, or any other direct or indirect
+              harm arising from installing, configuring, or using this code.
+              See LICENSE (MIT) in the repo for the full legal
+              terms.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="error">By using or copying this code,
+              you accept full responsibility for the outcome on your own
+              system. This includes any hardware damage, financial loss, or
+              other consequences. This is not shared or transferred to the
+              author in any way.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="info">Test carefully before trusting it
+              unattended. Review the automations, understand what they do,
+              and monitor behavior closely — especially reserve/SOC-floor
+              logic and anything that controls charge/discharge — before
+              leaving it to run unsupervised.</ha-alert>
+            text_only: true
+          - type: markdown
+            content: >-
+              Full source, README, and license:
+              [github.com/Fr0gg3r1986/zendure-smart-export](https://github.com/Fr0gg3r1986/zendure-smart-export)
+            text_only: true
