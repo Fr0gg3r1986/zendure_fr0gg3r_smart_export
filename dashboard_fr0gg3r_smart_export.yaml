@@ -22,6 +22,14 @@
 # outcome on your own system. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.23.0
+#     - Grid Spike Settings now shows the home-load-jump side too: current
+#       home load, baseline, jump threshold, and a "Blocked By" field
+#       showing which check actually tripped (Grid Import / Home Load
+#       Jump / both). Same additions on Tablet Overview next to the peak
+#       timestamps. Companion to package v2.18.0's dual-signal spike
+#       detection (catches loads the battery silently absorbs during
+#       export, which the grid-only check couldn't see).
 #   2.22.0
 #     - Added "Last Peak Detected" and "Export Resumes At" fields, plus a
 #       24h Logbook history card, to Tablet Overview right after the Grid
@@ -236,7 +244,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.22.0 · by Fr0gg3r1986
+              Dashboard v2.23.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -582,26 +590,38 @@ views:
             icon: mdi:flash-alert
           - type: markdown
             content: >-
-              <ha-alert alert-type="info">Stops export the moment grid draw
-              spikes above threshold — catches any heavy appliance, smart or
-              not (e.g. a non-smart electric stove), since it watches the
-              meter rather than individual devices. Entry Delay ignores
-              brief transients; Clear Window rides through an appliance's
-              normal heating-element on/off cycling so it doesn't flap the
-              mode every time the load dips briefly.</ha-alert>
+              <ha-alert alert-type="info">Stops export the moment heavy
+              consumption is detected, from ANY appliance — smart or not
+              (e.g. a non-smart electric stove). Two independent checks:
+              grid draw above threshold (catches spikes while not
+              exporting), and home load jumping above its recent baseline
+              (catches spikes the battery silently absorbs while exporting,
+              which never show up on the grid meter at all). Entry Delay
+              ignores brief transients; Clear Window rides through an
+              appliance's normal heating-element on/off cycling so it
+              doesn't flap the mode every time the load dips
+              briefly.</ha-alert>
             text_only: true
           - type: entities
             entities:
               - entity: sensor.smart_export_p1_active_power
                 name: Current Grid Power
               - entity: input_number.zendure_grid_spike_threshold_w
-                name: Spike Threshold
+                name: Grid Spike Threshold
+              - entity: sensor.solar_used_now
+                name: Current Home Load
+              - entity: input_number.zendure_home_load_baseline_w
+                name: Home Load Baseline
+              - entity: input_number.zendure_home_load_jump_threshold_w
+                name: Home Load Jump Threshold
               - entity: input_number.zendure_grid_spike_entry_seconds
                 name: Entry Delay
               - entity: input_number.zendure_grid_spike_clear_minutes
                 name: Clear Window
               - entity: binary_sensor.zendure_grid_spike_detected
                 name: Currently Blocking?
+              - entity: sensor.zendure_grid_spike_source
+                name: Blocked By
       - type: grid
         cards:
           - type: heading
@@ -1610,6 +1630,8 @@ views:
                 name: Last Peak Detected
               - entity: sensor.zendure_grid_spike_resume_estimate
                 name: Export Resumes At
+              - entity: sensor.zendure_grid_spike_source
+                name: Blocked By
           - type: logbook
             title: Peak Detection History
             hours_to_show: 24
@@ -1644,5 +1666,5 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.22.0 · by Fr0gg3r1986
+              Dashboard v2.23.0 · by Fr0gg3r1986
             text_only: true
