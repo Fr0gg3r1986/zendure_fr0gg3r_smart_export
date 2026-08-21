@@ -6,6 +6,12 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.18.0 (2026-08-21)
+- Grid spike detection now catches heavy loads the battery silently absorbs during export (e.g. a non-smart stove/oven), which the grid-only check missed since the meter never crosses into import — the fixed-rate Quick Discharge just eats the extra draw, shrinking export instead of showing up as import.
+- Added a second, independent trigger: home load (`sensor.solar_used_now`, from `packages/solar_sensors.yaml`) jumping above a slowly-updating baseline (`input_number.zendure_home_load_baseline_w`, refreshed every minute ONLY while calm via new automation `smart_export_update_home_load_baseline`) by more than `input_number.zendure_home_load_jump_threshold_w` (default 400W). Either the existing grid-import check OR this one trips the same `binary_sensor.zendure_grid_spike_detected` — no other logic, automation gating, or dashboard entity needed to change.
+- Added `sensor.zendure_grid_spike_source` (diagnostic text) showing which check actually tripped: Grid Import / Home Load Jump / both.
+- Graceful degradation: if `sensor.solar_used_now` isn't available (the `solar_sensors.yaml` package not installed), the home-load check simply never trips and grid-based detection works exactly as before — no error, no missing dependency issue.
+
 ### 2.17.0 (2026-08-21)
 - Added grid-spike detection/resume timestamps. New `binary_sensor.zendure_grid_spike_raw` mirrors the threshold check with no `delay_on`/`delay_off`, purely so the exact moment power drops back under threshold is knowable. `sensor.zendure_grid_spike_resume_estimate` (timestamp) computes when export should resume, using that raw sensor's `last_changed` + the clear-window setting — only populated once the raw reading has actually cleared (still "unknown" while genuinely spiking, since the cooldown timer hasn't started yet).
 - `input_datetime.zendure_grid_spike_last_detected` + a new automation (`smart_export_track_grid_spike_detection`) record when each spike was first detected, so it's visible even after the block clears.
@@ -43,6 +49,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 ---
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
+
+### 2.23.0
+- Grid Spike Settings now shows the home-load-jump side too: current home load, baseline, jump threshold, and a "Blocked By" field showing which check actually tripped (Grid Import / Home Load Jump / both). Same additions on Tablet Overview next to the peak timestamps. Companion to package v2.18.0's dual-signal spike detection (catches loads the battery silently absorbs during export, which the grid-only check couldn't see).
 
 ### 2.22.0
 - Added "Last Peak Detected" and "Export Resumes At" fields, plus a 24h Logbook history card, to Tablet Overview right after the Grid Power vs Spike Threshold chart. Companion to package v2.17.0's grid-spike detection/resume timestamp tracking.
