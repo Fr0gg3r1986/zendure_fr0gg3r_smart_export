@@ -6,6 +6,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.16.1 (2026-08-21)
+- **Bug fix:** `binary_sensor.zendure_grid_spike_detected` failed config validation and was never created ("Unknown entity" on the dashboard). Cause: `delay_on`/`delay_off` were written as a nested dict with a template inside it (e.g. `delay_on: {seconds: "{{ ... }}"}`) — Home Assistant's schema only accepts a fixed literal duration OR a single flat template string evaluating to seconds, not a dict wrapping a template. Fixed to use the flat template form; `delay_off` now converts the minutes-based helper to seconds within the template.
+
 ### 2.16.0 (2026-08-21)
 - Added a grid-spike export block: `binary_sensor.zendure_grid_spike_detected` trips when `sensor.smart_export_p1_active_power` (the P1 wrapper sensor) exceeds `input_number.zendure_grid_spike_threshold_w` (default 300W), catching sudden heavy consumption from any appliance — smart or not (e.g. a non-smart electric stove) — since it watches the grid meter rather than individual devices.
 - Uses native `delay_on` (default 15s, `input_number.zendure_grid_spike_entry_seconds`) to ignore brief transients, and `delay_off` (default 5min, `input_number.zendure_grid_spike_clear_minutes`) so it rides through an appliance's normal heating-element on/off cycling instead of flapping the mode every time it cycles off.
