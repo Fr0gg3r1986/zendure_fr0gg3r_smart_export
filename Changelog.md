@@ -6,6 +6,18 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.16.0 (2026-08-21)
+- Added a grid-spike export block: `binary_sensor.zendure_grid_spike_detected` trips when `sensor.smart_export_p1_active_power` (the P1 wrapper sensor) exceeds `input_number.zendure_grid_spike_threshold_w` (default 300W), catching sudden heavy consumption from any appliance — smart or not (e.g. a non-smart electric stove) — since it watches the grid meter rather than individual devices.
+- Uses native `delay_on` (default 15s, `input_number.zendure_grid_spike_entry_seconds`) to ignore brief transients, and `delay_off` (default 5min, `input_number.zendure_grid_spike_clear_minutes`) so it rides through an appliance's normal heating-element on/off cycling instead of flapping the mode every time it cycles off.
+- Blocks/reverts export the same way the aircon and low-solar blocks already do, reverting to whichever mode `input_select.zendure_revert_mode` is currently set to.
+
+### 2.15.0 (2026-08-21)
+- **Bug fix:** `binary_sensor.zendure_aircon_reserve_needed`'s temperature check was being silently bypassed whenever export was armed. The "away" condition incorrectly included `input_boolean.zendure_export_armed` (the same toggle required for export to run at all), so whenever export could actually happen, the temperature-based block was disabled — only an actively-cooling AC unit could still block, not a hot room on its own. "Away" now only means vacation mode, as originally intended, so a hot room correctly blocks export whenever armed and not on vacation, regardless of the AC's current state.
+
+### 2.14.0 (2026-08-21)
+- Added solar forecast accuracy tracking. A new daily automation (`smart_export_snapshot_solar_accuracy`, 23:55) captures each plane's actual yield and Forecast.Solar's predicted total for that day into 6 new input_numbers, right before the daily yield sensors reset.
+- Added `sensor.smart_export_solar_actual_total_yesterday`, `sensor.smart_export_solar_predicted_total_yesterday`, and `sensor.smart_export_solar_forecast_accuracy` (%) for the dashboard's actual-vs-predicted comparison card and histogram.
+
 ### 2.13.0 (2026-08-21)
 - Added `input_text.smart_export_p1_meter_entity_prefix` and 11 wrapper template sensors (`sensor.smart_export_p1_active_power`, `_l1/l2/l3`, `active_voltage_l1/l2/l3`, `active_current_l1/l2/l3`, `wifi_strength`). The dashboard now references these fixed names instead of a raw HomeWizard P1 entity ID directly — set the prefix once (Export Settings tab) and everything follows automatically. Removes the need to find-and-replace P1 entity IDs in the dashboard YAML, and keeps the public repo free of any hardware-specific identifiers.
 
@@ -25,8 +37,14 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
 
+### 2.19.0
+- Added a "Grid Spike Blocking" tile to Export Control, and a new "Grid Spike Settings" section on Export Settings: current grid power, spike threshold, entry delay, clear window, live block status. Companion to package v2.16.0's grid-spike export block.
+
 ### 2.18.0
 - Added a "Disclaimer" view: the full README disclaimer rendered as alert cards directly in the dashboard UI, not just in YAML comments.
+
+### 2.17.0
+- Added a "Forecast Accuracy" section to the Solar view: per-inverter actual-vs-predicted comparison (yesterday), a combined accuracy %, and a 30-day actual-vs-predicted histogram. Companion to package v2.14.0's daily solar accuracy snapshot automation.
 
 ### 2.16.0
 - P1 meter cards now reference `sensor.smart_export_p1_*` wrapper sensors (from package v2.13.0) instead of a raw HomeWizard entity ID directly — set `input_text.smart_export_p1_meter_entity_prefix` once (new "P1 Meter Settings" section on Export Settings) and every P1 card follows automatically. No more manual find-and-replace needed when reusing this dashboard on a different system.
