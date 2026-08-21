@@ -25,6 +25,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
 
+### 2.18.0
+- Added a "Disclaimer" view: the full README disclaimer rendered as alert cards directly in the dashboard UI, not just in YAML comments.
+
 ### 2.16.0
 - P1 meter cards now reference `sensor.smart_export_p1_*` wrapper sensors (from package v2.13.0) instead of a raw HomeWizard entity ID directly — set `input_text.smart_export_p1_meter_entity_prefix` once (new "P1 Meter Settings" section on Export Settings) and every P1 card follows automatically. No more manual find-and-replace needed when reusing this dashboard on a different system.
 
