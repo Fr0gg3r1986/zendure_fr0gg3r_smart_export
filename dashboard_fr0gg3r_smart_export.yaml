@@ -22,6 +22,13 @@
 # outcome on your own system. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.24.0
+#     - Added a per-parameter explanation card to Grid Spike Settings —
+#       every field (Current Grid Power, Grid Spike Threshold, Current
+#       Home Load, Home Load Baseline, Home Load Jump Threshold, Entry
+#       Delay, Clear Window, Currently Blocking?, Blocked By) now has a
+#       one-line plain-language explanation directly on the dashboard, so
+#       the mechanism doesn't need to be remembered.
 #   2.23.0
 #     - Grid Spike Settings now shows the home-load-jump side too: current
 #       home load, baseline, jump threshold, and a "Blocked By" field
@@ -244,7 +251,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.23.0 · by Fr0gg3r1986
+              Dashboard v2.24.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -590,17 +597,12 @@ views:
             icon: mdi:flash-alert
           - type: markdown
             content: >-
-              <ha-alert alert-type="info">Stops export the moment heavy
-              consumption is detected, from ANY appliance — smart or not
-              (e.g. a non-smart electric stove). Two independent checks:
-              grid draw above threshold (catches spikes while not
-              exporting), and home load jumping above its recent baseline
-              (catches spikes the battery silently absorbs while exporting,
-              which never show up on the grid meter at all). Entry Delay
-              ignores brief transients; Clear Window rides through an
-              appliance's normal heating-element on/off cycling so it
-              doesn't flap the mode every time the load dips
-              briefly.</ha-alert>
+              <ha-alert alert-type="info">**How it works:** two independent
+              checks, either one blocks export. Grid Import catches a spike
+              while you're not exporting. Home Load Jump catches a spike
+              the battery silently absorbs while you ARE exporting — it
+              eats extra load without the grid meter ever showing it, which
+              Grid Import alone would miss.</ha-alert>
             text_only: true
           - type: entities
             entities:
@@ -622,6 +624,45 @@ views:
                 name: Currently Blocking?
               - entity: sensor.zendure_grid_spike_source
                 name: Blocked By
+          - type: markdown
+            content: >-
+              **What each field means:**
+
+              - **Current Grid Power** — what your P1 meter reads right
+              now. Negative = exporting to the grid, positive = importing
+              from it.
+
+              - **Grid Spike Threshold** — if grid import goes above this,
+              it counts as a spike. Only matters when you're not currently
+              exporting (or the spike is bigger than the battery can
+              cover).
+
+              - **Current Home Load** — what your house is actually using
+              right now, calculated from solar + battery + grid together —
+              stays accurate even while exporting.
+
+              - **Home Load Baseline** — "normal" load right now.
+              Auto-updates every minute, but only while calm, so it always
+              reflects genuine current usage. You don't set this yourself.
+
+              - **Home Load Jump Threshold** — how far *above* the baseline
+              counts as a spike (not a fixed number). Example: baseline
+              350W + threshold 400W → spike triggers once load passes 750W.
+
+              - **Entry Delay** — how many seconds a spike must last before
+              it's treated as real, so a brief blip doesn't block export.
+
+              - **Clear Window** — how many minutes things must stay calm
+              before export is allowed to resume. Rides through an
+              appliance's normal on/off heating-element cycling instead of
+              flapping the mode every time it briefly dips.
+
+              - **Currently Blocking?** — is export being blocked by a
+              spike right now.
+
+              - **Blocked By** — which check actually tripped: Grid Import,
+              Home Load Jump, or both.
+            text_only: true
       - type: grid
         cards:
           - type: heading
@@ -1666,5 +1707,5 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.23.0 · by Fr0gg3r1986
+              Dashboard v2.24.0 · by Fr0gg3r1986
             text_only: true
