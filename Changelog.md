@@ -6,6 +6,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.13.0 (2026-08-21)
+- Added `input_text.smart_export_p1_meter_entity_prefix` and 11 wrapper template sensors (`sensor.smart_export_p1_active_power`, `_l1/l2/l3`, `active_voltage_l1/l2/l3`, `active_current_l1/l2/l3`, `wifi_strength`). The dashboard now references these fixed names instead of a raw HomeWizard P1 entity ID directly — set the prefix once (Export Settings tab) and everything follows automatically. Removes the need to find-and-replace P1 entity IDs in the dashboard YAML, and keeps the public repo free of any hardware-specific identifiers.
+
 ### 2.12.0 (2026-08-21)
 - Added a low-solar-tomorrow export block: `sensor.zendure_solar_forecast_tomorrow` sums Forecast.Solar's per-plane "tomorrow" estimate across all 3 real solar systems (Huawei south, SolaX X1 east, SolaX X2 west). `binary_sensor.zendure_low_solar_tomorrow` trips when that sum falls below `input_number.zendure_low_solar_threshold_kwh` (default 5 kWh — see [TODO](README.md#known-todos--testing-notes)). When tripped, evening export is blocked the same way the aircon reserve block already works — preventing the battery being drained by price-chasing export on an evening before a low-sun day, when it may not fully recharge. Overridable per-day via `input_boolean.zendure_ignore_low_solar_forecast`.
 - Requires the Forecast.Solar integration (or compatible) configured per solar plane.
@@ -21,6 +24,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 ---
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
+
+### 2.16.0
+- P1 meter cards now reference `sensor.smart_export_p1_*` wrapper sensors (from package v2.13.0) instead of a raw HomeWizard entity ID directly — set `input_text.smart_export_p1_meter_entity_prefix` once (new "P1 Meter Settings" section on Export Settings) and every P1 card follows automatically. No more manual find-and-replace needed when reusing this dashboard on a different system.
 
 ### 2.15.0
 - Added a Forecast section to the Solar view: combined + per-plane today/this-hour/remaining-today figures, peak production times, and a clearly flagged display of an unmatched 4th Forecast.Solar device (appears to be an empty/misconfigured entry — not used in any totals).
