@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.15.0 (2026-08-21)
+# Version: 2.16.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -22,6 +22,20 @@
 # LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.16.0 (2026-08-21)
+#     - Added a grid-spike export block: binary_sensor.zendure_grid_spike_detected
+#       trips when sensor.smart_export_p1_active_power (the P1 wrapper sensor)
+#       exceeds input_number.zendure_grid_spike_threshold_w (default 300W),
+#       catching sudden heavy consumption from ANY appliance — smart or not
+#       (e.g. a non-smart electric stove) — since it watches the grid meter
+#       rather than individual devices. Uses native delay_on (default 15s,
+#       input_number.zendure_grid_spike_entry_seconds) to ignore brief
+#       transients, and delay_off (default 5min,
+#       input_number.zendure_grid_spike_clear_minutes) so it rides through
+#       an appliance's normal heating-element on/off cycling instead of
+#       flapping the mode every time it cycles off. Blocks/reverts export
+#       the same way the aircon and low-solar blocks already do, using
+#       whichever mode input_select.zendure_revert_mode is currently set to.
 #   2.15.0 (2026-08-21)
 #     - BUG FIX: binary_sensor.zendure_aircon_reserve_needed's temperature
 #       check was being silently bypassed whenever export was armed. The
@@ -290,6 +304,31 @@ input_number:
     unit_of_measurement: "kWh"
     icon: mdi:weather-cloudy-alert
 
+  zendure_grid_spike_threshold_w:
+    name: Zendure - Grid Spike Threshold
+    min: 0
+    max: 3000
+    step: 50
+    initial: 300
+    unit_of_measurement: "W"
+    icon: mdi:flash-alert
+  zendure_grid_spike_entry_seconds:
+    name: Zendure - Grid Spike Entry Delay
+    min: 0
+    max: 120
+    step: 5
+    initial: 15
+    unit_of_measurement: "s"
+    icon: mdi:timer-outline
+  zendure_grid_spike_clear_minutes:
+    name: Zendure - Grid Spike Clear Window
+    min: 1
+    max: 30
+    step: 1
+    initial: 5
+    unit_of_measurement: "min"
+    icon: mdi:timer-check-outline
+
 input_boolean:
   zendure_export_armed:
     name: Zendure - Allow price-based export (I'm away)
@@ -387,6 +426,26 @@ template:
           {% set threshold = states('input_number.zendure_low_solar_threshold_kwh') | float(5) %}
           {{ forecast < threshold }}
 
+      - name: "Zendure Grid Spike Detected"
+        icon: mdi:flash-alert
+        device_class: problem
+        delay_on:
+          seconds: "{{ states('input_number.zendure_grid_spike_entry_seconds') | int(15) }}"
+        delay_off:
+          minutes: "{{ states('input_number.zendure_grid_spike_clear_minutes') | int(5) }}"
+        state: >
+          {# Catches sudden heavy grid draw (e.g. non-smart electric stove,
+             or any large appliance) while exporting. Uses the P1 wrapper
+             sensor so it works regardless of your actual meter's entity ID.
+             delay_on = must stay above threshold this long before blocking
+             (ignores brief transients). delay_off = must stay below
+             threshold continuously this long before resuming export
+             (rides through a heating element's normal on/off cycling
+             instead of flapping the mode every time it cycles off). #}
+          {% set power = states('sensor.smart_export_p1_active_power') | float(0) %}
+          {% set threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
+          {{ power > threshold }}
+
       - name: "Zendure Export Active"
         icon: mdi:transmission-tower-export
         device_class: running
@@ -395,11 +454,12 @@ template:
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
           {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
                                     and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
+          {% set grid_spike_block = is_state('binary_sensor.zendure_grid_spike_detected', 'on') %}
           {% set mode_ok = states('input_select.zendure_operation_mode') == 'Quick Discharge' %}
           {% set soc_ok = states('sensor.zendure_true_total_state_of_charge') | float(0) >
                           states('input_number.zendure_night_reserve_soc') | float(0) %}
           {% set peak_hour = is_state('sensor.dynamic_highest_price_period', 'Yes') %}
-          {{ armed and not aircon_block and not low_solar_block and mode_ok and soc_ok and peak_hour }}
+          {{ armed and not aircon_block and not low_solar_block and not grid_spike_block and mode_ok and soc_ok and peak_hour }}
 
   - sensor:
       - name: "Zendure Solar Forecast Tomorrow"
@@ -576,6 +636,7 @@ template:
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
           {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
                                     and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
+          {% set grid_spike_block = is_state('binary_sensor.zendure_grid_spike_detected', 'on') %}
           {% set custom_time = states('input_text.zendure_custom_not_before_time_today') %}
           {% set has_custom = custom_time not in ['', 'unknown', 'unavailable'] %}
           {% if has_custom %}
@@ -597,6 +658,8 @@ template:
             Blocked — an airco is cooling, or a room is too hot while you're home
           {% elif low_solar_block %}
             Blocked — tomorrow's solar forecast ({{ states('sensor.zendure_solar_forecast_tomorrow') }} kWh) is below threshold
+          {% elif grid_spike_block %}
+            Blocked — high grid draw detected ({{ states('sensor.smart_export_p1_active_power') }} W), waiting for it to clear
           {% elif soc <= reserve %}
             Blocked — battery at {{ soc }}%, at/below reserve floor of {{ reserve }}%
           {% elif not vacation and not prompt_approved and not not_waiting %}
@@ -625,6 +688,7 @@ template:
           {% set aircon_block = is_state('binary_sensor.zendure_aircon_reserve_needed', 'on') %}
           {% set low_solar_block = is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
                                     and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') %}
+          {% set grid_spike_block = is_state('binary_sensor.zendure_grid_spike_detected', 'on') %}
           {% set current_mode = states('input_select.zendure_operation_mode') %}
           {% set target_mode = 'Quick Discharge' %}
           {% set revert_mode = states('input_select.zendure_revert_mode') %}
@@ -647,6 +711,8 @@ template:
             Blocked by aircon — resumes when clear
           {% elif low_solar_block %}
             Blocked by low solar forecast — resumes when clear or overridden
+          {% elif grid_spike_block %}
+            Blocked by high grid draw — resumes once it clears
           {% elif current_mode == target_mode %}
             {% if data %}
               {% set toekomst = data
@@ -781,7 +847,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.15.0"
+        state: "2.16.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -958,10 +1024,10 @@ automation:
       Directly controls Quick Discharge based on Gielz1986's own price-ranking
       flag (sensor.dynamic_highest_price_period) instead of delegating to his
       Dynamic Trading mode branch. Entry requires: armed, no aircon block, no
-      low-solar-tomorrow block, past the configured start hour (unless on
-      vacation), above reserve, and the current hour flagged as a top price
-      period. Reverts to the fixed "Revert To Mode" the moment any of those
-      stop being true.
+      low-solar-tomorrow block, no grid-spike block, past the configured
+      start hour (unless on vacation), above reserve, and the current hour
+      flagged as a top price period. Reverts to the fixed "Revert To Mode"
+      the moment any of those stop being true.
     trigger:
       - platform: state
         entity_id: input_boolean.zendure_export_armed
@@ -971,6 +1037,8 @@ automation:
         entity_id: binary_sensor.zendure_low_solar_tomorrow
       - platform: state
         entity_id: input_boolean.zendure_ignore_low_solar_forecast
+      - platform: state
+        entity_id: binary_sensor.zendure_grid_spike_detected
       - platform: state
         entity_id: sensor.dynamic_highest_price_period
       - platform: time_pattern
@@ -988,6 +1056,9 @@ automation:
                 value_template: >-
                   {{ not is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
                      or is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on') }}
+              - condition: state
+                entity_id: binary_sensor.zendure_grid_spike_detected
+                state: "off"
               - condition: template
                 value_template: >-
                   {{ is_state('input_boolean.zendure_vacation_mode', 'on')
@@ -1028,6 +1099,7 @@ automation:
                      is_state('binary_sensor.zendure_low_solar_tomorrow', 'on')
                      and not is_state('input_boolean.zendure_ignore_low_solar_forecast', 'on')
                    )
+                   or is_state('binary_sensor.zendure_grid_spike_detected', 'on')
                    or (
                      not is_state('input_boolean.zendure_vacation_mode', 'on')
                      and not is_state('input_boolean.zendure_prompt_approved_today', 'on')
