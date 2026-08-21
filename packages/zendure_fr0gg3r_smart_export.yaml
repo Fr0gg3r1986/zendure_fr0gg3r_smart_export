@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.18.0 (2026-08-21)
+# Version: 2.18.1 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -22,6 +22,22 @@
 # LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.18.1 (2026-08-21)
+#     - BUG FIX (critical): smart_export_update_home_load_baseline never
+#       actually ran. Two stacked bugs: (1) trigger used "minutes: 1" which
+#       HA interprets as "fire once, at minute 01 of every hour" — not
+#       "every 1 minute" as intended. Fixed to "minutes: '/1'". (2) Even
+#       once firing correctly, the update condition gated on the COMBINED
+#       spike signal (binary_sensor.zendure_grid_spike_detected), which
+#       includes the home-load-jump check — but that check compares
+#       against the very baseline this automation is trying to set, and
+#       the baseline starts at 0. Real home load minus a 0 baseline looks
+#       like a permanent false spike from the moment of deployment, which
+#       permanently blocked the one automation that could ever correct it
+#       — a self-inflicted deadlock with no way out. Fixed by gating the
+#       condition on grid power directly instead (a signal with zero
+#       dependency on the baseline), so it always self-corrects within a
+#       minute of startup regardless of the home-load side's state.
 #   2.18.0 (2026-08-21)
 #     - Grid spike detection now catches heavy loads the battery silently
 #       absorbs during export (e.g. a non-smart stove/oven), which the
@@ -982,7 +998,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.18.0"
+        state: "2.18.1"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -1544,20 +1560,27 @@ automation:
     alias: Smart Export - Update Home Load Baseline
     description: >-
       Refreshes the "normal" home load reference point every minute, but
-      ONLY while no spike is currently blocking — so a spike itself never
-      gets baked into its own baseline. During a spike, the baseline stays
-      frozen at its last known calm value, keeping the jump comparison
-      meaningful throughout. Requires sensor.solar_used_now (corrected
-      home-load calc, packages/solar_sensors.yaml) — if that sensor doesn't
-      exist, this just keeps writing 0 and the home-load-jump check simply
-      never trips; grid-based detection is unaffected either way.
+      ONLY while grid power itself isn't spiking — so a genuine spike never
+      gets baked into its own baseline. Deliberately gated on the
+      grid-import signal alone (not the combined/home-load spike signal),
+      since that would be circular: the baseline starts at 0, so the very
+      first evaluation would look like a false spike relative to 0,
+      permanently blocking, which would permanently prevent the baseline
+      from ever updating — a self-inflicted deadlock. Gating on grid power
+      directly has no such dependency, so the baseline always self-corrects
+      within a minute of startup regardless of the home-load side's state.
+      Requires sensor.solar_used_now (corrected home-load calc,
+      packages/solar_sensors.yaml) — if that sensor doesn't exist, this
+      just keeps writing 0 and the home-load-jump check simply never trips;
+      grid-based detection is unaffected either way.
     trigger:
       - platform: time_pattern
-        minutes: 1
+        minutes: "/1"
     condition:
-      - condition: state
-        entity_id: binary_sensor.zendure_grid_spike_detected
-        state: "off"
+      - condition: template
+        value_template: >-
+          {{ (states('sensor.smart_export_p1_active_power') | float(0)) <=
+             (states('input_number.zendure_grid_spike_threshold_w') | float(300)) }}
     action:
       - service: input_number.set_value
         target:
