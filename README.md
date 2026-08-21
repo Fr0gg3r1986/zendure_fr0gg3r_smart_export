@@ -68,6 +68,7 @@ This is **not** a replacement for Gielz1986's integration — it's an add-on pac
 6. Restart Home Assistant.
 7. Add `dashboard_fr0gg3r_smart_export.yaml` as a new dashboard (Settings → Dashboards → Add Dashboard → Edit in YAML, paste the contents).
 8. Go to the **Export Settings** tab and configure your reserve SOC, notification phone(s), aircon sensors, and (optionally) your low-solar threshold.
+9. On the **Export Settings** tab, set `P1 Meter Entity Prefix` to your P1 meter's entity ID prefix (e.g. `p1_meter_5c2faf0f7b00` if your meter is `sensor.p1_meter_5c2faf0f7b00_active_power`) — every P1 card on the dashboard follows this automatically. Check Developer Tools → States if you're not sure of your exact entity ID. No YAML editing required.
 
 ## Known TODOs / Testing Notes
 
@@ -106,6 +107,7 @@ If you're on a single unit, or units of matched capacity, this workaround is a n
 | `input_number.zendure_low_solar_threshold_kwh` | Combined tomorrow solar forecast (kWh) below which export is blocked. Set to 0 to disable. |
 | `input_boolean.zendure_ignore_low_solar_forecast` | Per-day override for the low-solar block |
 | `input_text.zendure_notify_phone1/2` | Notify service names for push notifications |
+| `input_text.smart_export_p1_meter_entity_prefix` | Your P1 meter's entity ID prefix — dashboard P1 cards follow this automatically |
 
 ## Credits
 
