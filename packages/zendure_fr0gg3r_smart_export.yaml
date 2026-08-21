@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.13.0 (2026-08-21)
+# Version: 2.14.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -16,6 +16,15 @@
 # loss, or any other harm. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.14.0 (2026-08-21)
+#     - Added solar forecast accuracy tracking. A new daily automation
+#       (smart_export_snapshot_solar_accuracy, 23:55) captures each plane's
+#       actual yield and Forecast.Solar's predicted total for that day into
+#       6 new input_numbers, right before the daily yield sensors reset.
+#     - Added sensor.smart_export_solar_actual_total_yesterday,
+#       sensor.smart_export_solar_predicted_total_yesterday, and
+#       sensor.smart_export_solar_forecast_accuracy (%) for the dashboard's
+#       actual-vs-predicted comparison card and histogram.
 #   2.13.0 (2026-08-21)
 #     - Added input_text.smart_export_p1_meter_entity_prefix and 11 wrapper
 #       template sensors (sensor.smart_export_p1_active_power, _l1/l2/l3,
@@ -183,6 +192,61 @@ input_number:
     initial: 50
     unit_of_measurement: "%"
     icon: mdi:battery-charging-40
+
+  smart_export_solar_actual_huawei_kwh:
+    name: Smart Export - Solar Actual Yesterday (Huawei)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:solar-power-variant
+  smart_export_solar_actual_x1_kwh:
+    name: Smart Export - Solar Actual Yesterday (X1)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:solar-power-variant
+  smart_export_solar_actual_x2_kwh:
+    name: Smart Export - Solar Actual Yesterday (X2)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:solar-power-variant
+  smart_export_solar_predicted_huawei_kwh:
+    name: Smart Export - Solar Predicted Yesterday (Huawei)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:weather-partly-cloudy
+  smart_export_solar_predicted_x1_kwh:
+    name: Smart Export - Solar Predicted Yesterday (X1)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:weather-partly-cloudy
+  smart_export_solar_predicted_x2_kwh:
+    name: Smart Export - Solar Predicted Yesterday (X2)
+    min: 0
+    max: 50
+    step: 0.01
+    initial: 0
+    mode: box
+    unit_of_measurement: "kWh"
+    icon: mdi:weather-partly-cloudy
 
   zendure_aircon_temp_threshold:
     name: Aircon Reserve Temperature Threshold
@@ -446,6 +510,48 @@ template:
           {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
           {{ states('sensor.' ~ prefix ~ '_wi_fi_strength') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
 
+      # ---------------------------------------------------------------------
+      # Solar forecast accuracy tracking. A daily automation (see below)
+      # snapshots yesterday's actual yield and predicted forecast into the
+      # 6 input_numbers above, right before midnight. These sensors sum
+      # those snapshots into daily totals for the dashboard's actual-vs-
+      # predicted comparison card and histogram.
+      # ---------------------------------------------------------------------
+      - name: "Smart Export Solar Actual Total Yesterday"
+        icon: mdi:solar-power-variant
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: >
+          {% set h = states('input_number.smart_export_solar_actual_huawei_kwh') | float(0) %}
+          {% set x1 = states('input_number.smart_export_solar_actual_x1_kwh') | float(0) %}
+          {% set x2 = states('input_number.smart_export_solar_actual_x2_kwh') | float(0) %}
+          {{ (h + x1 + x2) | round(2) }}
+
+      - name: "Smart Export Solar Predicted Total Yesterday"
+        icon: mdi:weather-partly-cloudy
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: measurement
+        state: >
+          {% set h = states('input_number.smart_export_solar_predicted_huawei_kwh') | float(0) %}
+          {% set x1 = states('input_number.smart_export_solar_predicted_x1_kwh') | float(0) %}
+          {% set x2 = states('input_number.smart_export_solar_predicted_x2_kwh') | float(0) %}
+          {{ (h + x1 + x2) | round(2) }}
+
+      - name: "Smart Export Solar Forecast Accuracy"
+        icon: mdi:target
+        unit_of_measurement: "%"
+        state_class: measurement
+        state: >
+          {% set predicted = states('sensor.smart_export_solar_predicted_total_yesterday') | float(0) %}
+          {% set actual = states('sensor.smart_export_solar_actual_total_yesterday') | float(0) %}
+          {% if predicted <= 0 %}
+            unknown
+          {% else %}
+            {{ ((actual / predicted) * 100) | round(1) }}
+          {% endif %}
+
       - name: "Zendure Export Reason"
         icon: mdi:information-outline
         state: >
@@ -660,7 +766,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.13.0"
+        state: "2.14.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -1148,4 +1254,47 @@ automation:
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.zendure_prompt_approved_today
+    mode: single
+
+  - id: smart_export_snapshot_solar_accuracy
+    alias: Smart Export - Snapshot Daily Solar Accuracy
+    description: >-
+      Captures each solar plane's actual daily yield and Forecast.Solar's
+      predicted total for that day, right before the daily yield sensors
+      reset at midnight. Feeds the actual-vs-predicted comparison card and
+      histogram on the dashboard.
+    trigger:
+      - platform: time
+        at: "23:55:00"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_actual_huawei_kwh
+        data:
+          value: "{{ states('sensor.inverter_daily_yield') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_actual_x1_kwh
+        data:
+          value: "{{ states('sensor.solax_x1_yieldtoday') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_actual_x2_kwh
+        data:
+          value: "{{ states('sensor.solax_x2_yieldtoday') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_predicted_huawei_kwh
+        data:
+          value: "{{ states('sensor.energy_production_today') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_predicted_x1_kwh
+        data:
+          value: "{{ states('sensor.energy_production_today_2') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.smart_export_solar_predicted_x2_kwh
+        data:
+          value: "{{ states('sensor.energy_production_today_3') | float(0) }}"
     mode: single
