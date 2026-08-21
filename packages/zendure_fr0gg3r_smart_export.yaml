@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.12.0 (2026-08-21)
+# Version: 2.13.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -16,6 +16,15 @@
 # loss, or any other harm. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.13.0 (2026-08-21)
+#     - Added input_text.smart_export_p1_meter_entity_prefix and 11 wrapper
+#       template sensors (sensor.smart_export_p1_active_power, _l1/l2/l3,
+#       active_voltage_l1/l2/l3, active_current_l1/l2/l3, wifi_strength).
+#       The dashboard now references these fixed names instead of a raw
+#       HomeWizard P1 entity ID directly — set the prefix once (Export
+#       Settings tab) and everything follows automatically. Removes the
+#       need to find-and-replace P1 entity IDs in the dashboard YAML, and
+#       keeps the public repo free of any hardware-specific identifiers.
 #   2.12.0 (2026-08-21)
 #     - Added a low-solar-tomorrow export block: sensor.zendure_solar_forecast_tomorrow
 #       sums Forecast.Solar's per-plane "tomorrow" estimate across all 3 real
@@ -131,6 +140,12 @@ input_text:
   zendure_custom_not_before_time_today:
     name: Zendure - Custom Export Start Time Tonight
     icon: mdi:clock-plus-outline
+
+  smart_export_p1_meter_entity_prefix:
+    name: Smart Export - P1 Meter Entity Prefix
+    icon: mdi:transmission-tower
+    max: 100
+    mode: text
 
   zendure_bedroom1_temp_sensor:
     name: Bedroom 1 Temperature Sensor
@@ -322,6 +337,114 @@ template:
           {% set x1 = states('sensor.energy_production_tomorrow_2') | float(0) %}
           {% set x2 = states('sensor.energy_production_tomorrow_3') | float(0) %}
           {{ (huawei + x1 + x2) | round(2) }}
+
+      # ---------------------------------------------------------------------
+      # P1 meter wrapper sensors — dashboard-stable proxy entities.
+      #
+      # The dashboard references these fixed names, never the raw HomeWizard
+      # entity directly. Set input_text.smart_export_p1_meter_entity_prefix
+      # to your P1 meter's entity ID prefix (everything before the metric
+      # suffix, e.g. "p1_meter_5c2faf0f7b00" for
+      # sensor.p1_meter_5c2faf0f7b00_active_power) once, on the Export
+      # Settings tab — these sensors then follow it automatically. No YAML
+      # editing needed if your meter's entity ID changes or you're setting
+      # this up fresh on a different system.
+      # ---------------------------------------------------------------------
+      - name: "Smart Export P1 Active Power"
+        icon: mdi:transmission-tower
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_power') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Power L1"
+        icon: mdi:sine-wave
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_power_l1') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Power L2"
+        icon: mdi:sine-wave
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_power_l2') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Power L3"
+        icon: mdi:sine-wave
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_power_l3') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Voltage L1"
+        icon: mdi:sine-wave
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_voltage_l1') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Voltage L2"
+        icon: mdi:sine-wave
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_voltage_l2') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Voltage L3"
+        icon: mdi:sine-wave
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_voltage_l3') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Current L1"
+        icon: mdi:current-ac
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_current_l1') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Current L2"
+        icon: mdi:current-ac
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_current_l2') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 Active Current L3"
+        icon: mdi:current-ac
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_active_current_l3') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
+
+      - name: "Smart Export P1 WiFi Strength"
+        icon: mdi:wifi
+        state: >
+          {% set prefix = states('input_text.smart_export_p1_meter_entity_prefix') %}
+          {{ states('sensor.' ~ prefix ~ '_wi_fi_strength') if prefix not in ['', 'unknown', 'unavailable'] else 'unavailable' }}
 
       - name: "Zendure Export Reason"
         icon: mdi:information-outline
@@ -537,7 +660,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.12.0"
+        state: "2.13.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
