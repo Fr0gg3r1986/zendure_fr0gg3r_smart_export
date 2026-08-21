@@ -6,6 +6,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
 
+### 2.18.1 (2026-08-21)
+- **Bug fix (critical):** `smart_export_update_home_load_baseline` never actually ran. Two stacked bugs: (1) trigger used `minutes: 1` which HA interprets as "fire once, at minute 01 of every hour" — not "every 1 minute" as intended. Fixed to `minutes: "/1"`. (2) Even once firing correctly, the update condition gated on the COMBINED spike signal (`binary_sensor.zendure_grid_spike_detected`), which includes the home-load-jump check — but that check compares against the very baseline this automation is trying to set, and the baseline starts at 0. Real home load minus a 0 baseline looks like a permanent false spike from the moment of deployment, which permanently blocked the one automation that could ever correct it — a self-inflicted deadlock with no way out. Fixed by gating the condition on grid power directly instead (a signal with zero dependency on the baseline), so it always self-corrects within a minute of startup regardless of the home-load side's state.
+
 ### 2.18.0 (2026-08-21)
 - Grid spike detection now catches heavy loads the battery silently absorbs during export (e.g. a non-smart stove/oven), which the grid-only check missed since the meter never crosses into import — the fixed-rate Quick Discharge just eats the extra draw, shrinking export instead of showing up as import.
 - Added a second, independent trigger: home load (`sensor.solar_used_now`, from `packages/solar_sensors.yaml`) jumping above a slowly-updating baseline (`input_number.zendure_home_load_baseline_w`, refreshed every minute ONLY while calm via new automation `smart_export_update_home_load_baseline`) by more than `input_number.zendure_home_load_jump_threshold_w` (default 400W). Either the existing grid-import check OR this one trips the same `binary_sensor.zendure_grid_spike_detected` — no other logic, automation gating, or dashboard entity needed to change.
@@ -49,6 +52,9 @@ All notable changes to Zendure Fr0gg3r Smart Export are documented here. The pac
 ---
 
 ## Dashboard (`dashboard_fr0gg3r_smart_export.yaml`)
+
+### 2.24.0
+- Added a per-parameter explanation card to Grid Spike Settings — every field (Current Grid Power, Grid Spike Threshold, Current Home Load, Home Load Baseline, Home Load Jump Threshold, Entry Delay, Clear Window, Currently Blocking?, Blocked By) now has a one-line plain-language explanation directly on the dashboard, so the mechanism doesn't need to be remembered.
 
 ### 2.23.0
 - Grid Spike Settings now shows the home-load-jump side too: current home load, baseline, jump threshold, and a "Blocked By" field showing which check actually tripped (Grid Import / Home Load Jump / both). Same additions on Tablet Overview next to the peak timestamps. Companion to package v2.18.0's dual-signal spike detection (catches loads the battery silently absorbs during export, which the grid-only check couldn't see).
