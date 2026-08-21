@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.16.0 (2026-08-21)
+# Version: 2.16.1 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -22,6 +22,15 @@
 # LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.16.1 (2026-08-21)
+#     - BUG FIX: binary_sensor.zendure_grid_spike_detected failed config
+#       validation and was never created ("Unknown entity" on the
+#       dashboard). Cause: delay_on/delay_off were written as a nested dict
+#       with a template inside it (e.g. delay_on: {seconds: "{{ ... }}"}) —
+#       HA's schema only accepts a fixed literal duration OR a single flat
+#       template string evaluating to seconds, not a dict wrapping a
+#       template. Fixed to use the flat template form; delay_off now
+#       converts the minutes-based helper to seconds within the template.
 #   2.16.0 (2026-08-21)
 #     - Added a grid-spike export block: binary_sensor.zendure_grid_spike_detected
 #       trips when sensor.smart_export_p1_active_power (the P1 wrapper sensor)
@@ -429,10 +438,8 @@ template:
       - name: "Zendure Grid Spike Detected"
         icon: mdi:flash-alert
         device_class: problem
-        delay_on:
-          seconds: "{{ states('input_number.zendure_grid_spike_entry_seconds') | int(15) }}"
-        delay_off:
-          minutes: "{{ states('input_number.zendure_grid_spike_clear_minutes') | int(5) }}"
+        delay_on: "{{ states('input_number.zendure_grid_spike_entry_seconds') | int(15) }}"
+        delay_off: "{{ (states('input_number.zendure_grid_spike_clear_minutes') | int(5)) * 60 }}"
         state: >
           {# Catches sudden heavy grid draw (e.g. non-smart electric stove,
              or any large appliance) while exporting. Uses the P1 wrapper
@@ -847,7 +854,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.16.0"
+        state: "2.16.1"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
