@@ -8,6 +8,29 @@
 # (https://github.com/gast777/Zendure-zenSDK-proxy).
 #
 # Changelog:
+#   2.15.0
+#     - Added a Forecast section to the Solar view: combined + per-plane
+#       today/this-hour/remaining-today figures, peak production times, and
+#       a clearly flagged display of the unmatched 4th Forecast.Solar device
+#       (appears to be an empty/misconfigured entry — not used in any totals).
+#     - Added "Low Solar Blocking" tile to Export Control, and a new "Solar
+#       Reserve Settings" section on Export Settings: combined tomorrow
+#       forecast, threshold, live block status, per-day override toggle.
+#       Companion to package v2.12.0's low-solar-tomorrow export block.
+#     - Removed two leftover empty artifacts (a stray "New section" heading
+#       on Export Control, an empty trailing grid on Export Settings).
+# Changelog:
+#   2.15.0
+#     - Added a Forecast section to the Solar view: combined + per-plane
+#       today/this-hour/remaining-today figures, peak production times, and
+#       a clearly flagged display of the unmatched 4th Forecast.Solar device
+#       (appears to be an empty/misconfigured entry — not used in any totals).
+#     - Added "Low Solar Blocking" tile to Export Control, and a new "Solar
+#       Reserve Settings" section on Export Settings: combined tomorrow
+#       forecast, threshold, live block status, per-day override toggle.
+#       Companion to package v2.12.0's low-solar-tomorrow export block.
+#     - Removed two leftover empty artifacts (a stray "New section" heading
+#       on Export Control, an empty trailing grid on Export Settings).
 #   2.13.1
 #     - Added "Package vX.X.X · Dashboard vX.X.X · by Fr0gg3r1986" footer
 #       to the bottom of the Live view, matching the existing footer on
@@ -37,8 +60,8 @@
 views:
   - type: sections
     max_columns: 3
-    title: Live
-    path: live
+    title: Overview
+    path: overview
     icon: mdi:lightning-bolt
     sections:
       - type: grid
@@ -104,17 +127,6 @@ views:
               - entity: sensor.zendure_2_power
                 name: Unit 2 Power
                 icon: mdi:battery-charging-medium
-          - type: glance
-            show_name: true
-            show_icon: true
-            show_state: true
-            entities:
-              - entity: sensor.zendure_true_total_state_of_charge
-                name: Real SOC %
-                icon: mdi:battery-medium
-              - entity: sensor.zendure_1_state_of_charge
-              - entity: sensor.zendure_2_state_of_charge
-              - entity: sensor.zendure_total_state_of_charge
           - type: heading
             heading: Solar Detail
             heading_style: title
@@ -183,12 +195,12 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.13.1 · by Fr0gg3r1986
+              Dashboard v2.15.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
-    title: Custom Export
-    path: custom-export
+    title: Export Control
+    path: export-control
     icon: mdi:home-export-outline
     sections:
       - type: grid
@@ -207,6 +219,23 @@ views:
                 entity: binary_sensor.zendure_aircon_reserve_needed
                 name: Aircon Blocking
                 vertical: false
+              - type: tile
+                entity: binary_sensor.zendure_low_solar_tomorrow
+                name: Low Solar Blocking
+                vertical: false
+          - type: button
+            name: Force Stop Export Now
+            icon: mdi:stop-circle-outline
+            show_state: false
+            tap_action:
+              action: perform-action
+              perform_action: script.zendure_force_stop_export
+              data: {}
+              confirmation:
+                text: Stop export now and disarm?
+            grid_options:
+              columns: 12
+              rows: 2
           - type: entities
             entities:
               - entity: input_boolean.zendure_export_armed
@@ -231,36 +260,6 @@ views:
                 name: Export Sessions Today
               - entity: sensor.zendure_export_time_today
                 name: Total Export Time Today
-          - type: history-graph
-            title: SOC (last 6h)
-            hours_to_show: 6
-            entities:
-              - entity: sensor.zendure_true_total_state_of_charge
-                name: SOC %
-          - type: button
-            name: Force Stop Export Now
-            icon: mdi:stop-circle-outline
-            show_state: false
-            tap_action:
-              action: perform-action
-              perform_action: script.zendure_force_stop_export
-              data: {}
-              confirmation:
-                text: Stop export now and disarm?
-          - type: gauge
-            entity: sensor.zendure_true_total_state_of_charge
-            name: Current SOC
-            min: 0
-            max: 100
-            needle: true
-            severity:
-              red: 0
-              green: 50
-          - type: markdown
-            content: >-
-              Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.13.1 · by Fr0gg3r1986
-            text_only: true
       - type: grid
         cards:
           - type: heading
@@ -392,10 +391,16 @@ views:
                       fillColor: kleur
                     };
                   });
+          - type: history-graph
+            title: SOC (last 6h)
+            hours_to_show: 6
+            entities:
+              - entity: sensor.zendure_true_total_state_of_charge
+                name: SOC %
   - type: sections
     max_columns: 2
-    title: Custom Export Settings
-    path: custom-export-settings
+    title: Export Settings
+    path: export-settings
     icon: mdi:cog-outline
     sections:
       - type: grid
@@ -423,36 +428,6 @@ views:
                 name: Revert To Mode
               - entity: input_select.zendure_operation_mode
                 name: Operation Mode (editable)
-      - type: grid
-        cards:
-          - type: heading
-            heading: Notifications
-            heading_style: title
-            icon: mdi:bell-outline
-          - type: entities
-            entities:
-              - entity: input_boolean.zendure_notifications_enabled
-                name: Notifications Enabled
-              - entity: input_text.zendure_notify_phone1
-                name: Notify Phone 1
-              - entity: input_text.zendure_notify_phone2
-                name: Notify Phone 2
-          - type: button
-            name: Send Test Notification
-            icon: mdi:bell-check-outline
-            tap_action:
-              action: perform-action
-              perform_action: script.zendure_send_test_notification
-              data: {}
-          - type: markdown
-            content: >-
-              <ha-alert alert-type="info">Enter the full notify service name for
-              each phone (e.g. notify.mobile_app_johns_iphone) — find it under
-              Developer Tools → Actions, search "notify". Leave a field blank to
-              skip that phone.</ha-alert>
-            text_only: true
-      - type: grid
-        cards:
           - type: heading
             heading: Aircon Reserve Settings
             heading_style: title
@@ -481,6 +456,11 @@ views:
                     name: Airco
                   - entity: sensor.zendure_bedroom_1_airco_state
                     name: State
+            grid_options:
+              rows: auto
+              columns: full
+          - type: horizontal-stack
+            cards:
               - type: entities
                 title: Bedroom 2
                 show_header_toggle: false
@@ -493,6 +473,8 @@ views:
                     name: Airco
                   - entity: sensor.zendure_bedroom_2_airco_state
                     name: State
+          - type: horizontal-stack
+            cards:
               - type: entities
                 title: Bedroom 3
                 show_header_toggle: false
@@ -505,307 +487,62 @@ views:
                     name: Airco
                   - entity: sensor.zendure_bedroom_3_airco_state
                     name: State
-  - type: sections
-    max_columns: 4
-    title: Health
-    path: gezondheid
-    icon: mdi:battery-heart-variant
-    sections:
       - type: grid
         cards:
           - type: heading
-            heading: Battery Detail
+            heading: Solar Reserve Settings
             heading_style: title
-            icon: mdi:battery-heart-variant
-          - type: entities
-            entities:
-              - entity: sensor.zendure_set_charge_power
-                name: Charge Power Set
-                icon: mdi:battery-charging
-              - entity: sensor.zendure_set_discharge_power
-                name: Discharge Power Set
-                icon: mdi:battery-minus
-              - entity: sensor.zendure_inverter_max_charge_power
-                name: Max Charge Power
-              - entity: sensor.zendure_inverter_max_discharge_power
-                name: Max Discharge Power
-              - entity: sensor.zendure_minimum_state_of_charge
-                name: Min SOC
-              - entity: sensor.zendure_maximum_state_of_charge
-                name: Max SOC
-              - entity: sensor.zendure_relay_switches_today
-                name: ⚡ Total Switches Today
-                icon: mdi:swap-vertical-bold
-              - entity: sensor.zendure_relay_switches_charging_today
-                name: 🔋 → Charging (from Standby)
-                icon: mdi:battery-plus-variant
-              - entity: sensor.zendure_relay_switches_discharging_today
-                name: 🪫 → Discharging (from Standby)
-                icon: mdi:battery-minus-variant
-          - type: heading
-            heading: Energy Totals
-            heading_style: title
-            icon: mdi:counter
-          - type: entities
-            entities:
-              - entity: sensor.zendure_energy_import
-                name: Total Energy Charged
-              - entity: sensor.zendure_energy_export
-                name: Total Energy Discharged
-              - entity: sensor.zendure_pv_import
-                name: Total PV Through Battery
-              - entity: sensor.zendure_pv_import_daily
-                name: PV Through Battery Today
-  - type: sections
-    max_columns: 2
-    title: Geschiedenis
-    path: geschiedenis
-    icon: mdi:history
-    sections:
-      - type: grid
-        cards:
-          - type: heading
-            heading: Power (17h)
-            heading_style: title
-          - type: history-graph
-            title: Battery & Grid
-            hours_to_show: 17
-            entities:
-              - entity: sensor.zendure_charging_mode
-                name: Mode
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
-                name: Grid (P1)
-              - entity: sensor.zendure_power_export
-                name: Battery Discharge
-              - entity: sensor.zendure_power_import
-                name: Battery Charge
-              - entity: sensor.solar_power_ac_now
-                name: Solar
-              - entity: sensor.zendure_true_total_state_of_charge
-                name: SOC %
-      - type: grid
-        cards:
-          - type: heading
-            heading: Power (2h)
-            heading_style: title
-          - type: history-graph
-            title: Battery & Grid (4h)
-            entities:
-              - entity: sensor.zendure_charging_mode
-                name: Mode
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
-                name: Grid (P1)
-              - entity: sensor.zendure_power_export
-                name: Battery Discharge
-              - entity: sensor.zendure_power_import
-                name: Battery Charge
-              - entity: sensor.solar_power_ac_now
-                name: Solar
-              - entity: sensor.zendure_true_total_state_of_charge
-            hours_to_show: 4
-      - type: grid
-        cards:
-          - type: heading
-            heading: SOC & Efficiency
-            heading_style: title
-          - type: history-graph
-            title: SOC & Efficiency (24h)
-            hours_to_show: 24
-            entities:
-              - entity: sensor.zendure_true_total_state_of_charge
-                name: SOC %
-              - entity: sensor.zendure_export_efficiency_24h
-                name: Export Efficiency
-              - entity: sensor.zendure_import_efficiency_24h
-                name: Import Efficiency
-      - type: grid
-        cards:
-          - type: heading
-            heading: Connectivity
-            heading_style: title
-          - type: history-graph
-            title: Signal Strength (21h)
-            hours_to_show: 21
-            entities:
-              - entity: sensor.zendure_wifi_signal_strength
-                name: Zendure WiFi
-              - entity: sensor.p1_meter_5c2faf0f7b00_wi_fi_strength
-                name: P1 WiFi
-  - type: sections
-    max_columns: 2
-    subview: true
-    path: releasenotes
-    title: Releasenotes
-    icon: mdi:github
-    sections:
-      - type: grid
-        cards:
+            icon: mdi:weather-cloudy-alert
           - type: markdown
-            content: |
-              **{{ state_attr('sensor.github_zendure_gielz1986', 'tag_name')}}**
-              {{ state_attr('sensor.github_zendure_gielz1986', 'body')}}
+            content: >-
+              <ha-alert alert-type="info">Blocks evening export when
+              tomorrow's forecasted solar (Forecast.Solar, summed across all
+              3 systems) falls below the threshold — preventing the battery
+              being drained before a low-sun day when it may not fully
+              recharge. Set threshold to 0 to disable this block
+              entirely.</ha-alert>
+            text_only: true
+          - type: entities
+            entities:
+              - entity: sensor.zendure_solar_forecast_tomorrow
+                name: Forecast Tomorrow (Combined)
+              - entity: input_number.zendure_low_solar_threshold_kwh
+                name: Low Solar Threshold
+              - entity: binary_sensor.zendure_low_solar_tomorrow
+                name: Currently Blocking?
+              - entity: input_boolean.zendure_ignore_low_solar_forecast
+                name: Ignore Today (Override)
+      - type: grid
+        cards:
+          - type: heading
+            heading: Notifications
+            heading_style: title
+            icon: mdi:bell-outline
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="info">Enter the full notify service name for
+              each phone (e.g. notify.mobile_app_johns_iphone) — find it under
+              Developer Tools → Actions, search "notify". Leave a field blank to
+              skip that phone.</ha-alert>
+            text_only: true
+          - type: entities
+            entities:
+              - entity: input_boolean.zendure_notifications_enabled
+                name: Notifications Enabled
+              - entity: input_text.zendure_notify_phone1
+                name: Notify Phone 1
+              - entity: input_text.zendure_notify_phone2
+                name: Notify Phone 2
+          - type: button
+            name: Send Test Notification
+            icon: mdi:bell-check-outline
+            tap_action:
+              action: perform-action
+              perform_action: script.zendure_send_test_notification
+              data: {}
             grid_options:
-              columns: 24
-              rows: auto
-            text_only: true
-        column_span: 2
-    cards: []
-  - type: sections
-    max_columns: 2
-    title: Solar Flow
-    path: solar-flow
-    icon: mdi:solar-power-variant
-    sections:
-      - type: grid
-        cards:
-          - type: heading
-            heading: Live Distribution
-            heading_style: title
-            icon: mdi:lightning-bolt-circle
-          - type: glance
-            show_name: true
-            show_icon: true
-            show_state: true
-            entities:
-              - entity: sensor.solar_power_ac_now
-                name: Solar Total
-                icon: mdi:solar-power-variant
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
-                name: Grid (P1)
-                icon: mdi:transmission-tower
-              - entity: sensor.zendure_power_import
-                name: Battery Charge
-                icon: mdi:battery-charging
-          - type: entities
-            entities:
-              - entity: sensor.solax_x1_powerdc1
-                name: X1 DC String 1
-              - entity: sensor.solax_x2_powerdc1
-                name: X2 DC String 1
-              - entity: sensor.inverter_pv_1_voltage
-                name: Huawei PV1 Voltage
-              - entity: sensor.inverter_pv_1_current
-                name: Huawei PV1 Current
-            title: Solardc
-      - type: grid
-        cards:
-          - type: heading
-            heading: History (7 days)
-            heading_style: subtitle
-            icon: mdi:chart-timeline-variant
-          - type: history-graph
-            title: Solar Flow (7d)
-            hours_to_show: 168
-            entities:
-              - entity: sensor.solar_power_ac_now
-                name: Solar
-              - entity: sensor.solar_flow_to_house
-                name: To House
-              - entity: sensor.solar_flow_to_battery
-                name: To Battery
-              - entity: sensor.solar_flow_to_grid
-                name: To Grid
-          - type: history-graph
-            title: Self Consumption % (7d)
-            hours_to_show: 168
-            entities:
-              - entity: sensor.solar_self_consumption_ratio
-                name: Self Consumption %
-  - type: sections
-    max_columns: 3
-    title: P1 Meter
-    path: p1-meter
-    icon: mdi:transmission-tower
-    sections:
-      - type: grid
-        cards:
-          - type: heading
-            heading: Power
-            heading_style: title
-            icon: mdi:lightning-bolt
-          - type: glance
-            show_name: true
-            show_icon: true
-            show_state: true
-            entities:
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
-                name: Total Power
-                icon: mdi:transmission-tower
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l1
-                name: Phase L1
-                icon: mdi:sine-wave
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l2
-                name: Phase L2
-                icon: mdi:sine-wave
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l3
-                name: Phase L3
-                icon: mdi:sine-wave
-          - type: history-graph
-            title: Active Power (24h)
-            hours_to_show: 24
-            entities:
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
-                name: Total
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l1
-                name: L1
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l2
-                name: L2
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l3
-                name: L3
-          - type: markdown
-            content: >
-              <ha-alert alert-type="info"> Voltage and current sensors are
-              **disabled by default** in Home Assistant. Enable them via
-              Settings → Devices & Services → HomeWizard → your P1 meter →
-              entities. </ha-alert>
-            text_only: true
-          - type: heading
-            heading: Voltage & Current
-            heading_style: title
-            icon: mdi:sine-wave
-          - type: glance
-            show_name: true
-            show_icon: true
-            show_state: true
-            entities:
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l1
-                name: Voltage L1
-                icon: mdi:sine-wave
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l2
-                name: Voltage L2
-                icon: mdi:sine-wave
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l3
-                name: Voltage L3
-                icon: mdi:sine-wave
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l1
-                name: Current L1
-                icon: mdi:current-ac
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l2
-                name: Current L2
-                icon: mdi:current-ac
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l3
-                name: Current L3
-                icon: mdi:current-ac
-          - type: history-graph
-            title: Voltage (24h)
-            hours_to_show: 24
-            entities:
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l1
-                name: L1
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l2
-                name: L2
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l3
-                name: L3
-          - type: history-graph
-            title: Current (24h)
-            hours_to_show: 24
-            entities:
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l1
-                name: L1
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l2
-                name: L2
-              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l3
-                name: L3
+              columns: full
+              rows: 2
   - type: sections
     max_columns: 4
     title: Proxy Details
@@ -983,141 +720,6 @@ views:
                 row:
                   entity: sensor.zendure_battery_3_temperature
                   name: Battery 3 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_4_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_4_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_4_temperature
-                  name: Battery 4 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_5_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_5_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_5_temperature
-                  name: Battery 5 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_6_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_6_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_6_temperature
-                  name: Battery 6 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_7_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_7_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_7_temperature
-                  name: Battery 7 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_8_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_8_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_8_temperature
-                  name: Battery 8 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_9_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_9_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_9_temperature
-                  name: Battery 9 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_10_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_10_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_10_temperature
-                  name: Battery 10 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_11_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_11_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_11_temperature
-                  name: Battery 11 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_12_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_12_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_12_temperature
-                  name: Battery 12 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_13_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_13_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_13_temperature
-                  name: Battery 13 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_14_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_14_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_14_temperature
-                  name: Battery 14 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_15_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_15_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_15_temperature
-                  name: Battery 15 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_16_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_16_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_16_temperature
-                  name: Battery 16 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_17_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_17_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_17_temperature
-                  name: Battery 17 Temperature
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_18_temperature
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_18_temperature
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_18_temperature
-                  name: Battery 18 Temperature
               - type: divider
               - type: conditional
                 conditions:
@@ -1146,141 +748,6 @@ views:
                 row:
                   entity: sensor.zendure_battery_3_state_of_charge
                   name: Battery 3 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_4_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_4_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_4_state_of_charge
-                  name: Battery 4 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_5_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_5_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_5_state_of_charge
-                  name: Battery 5 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_6_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_6_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_6_state_of_charge
-                  name: Battery 6 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_7_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_7_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_7_state_of_charge
-                  name: Battery 7 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_8_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_8_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_8_state_of_charge
-                  name: Battery 8 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_9_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_9_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_9_state_of_charge
-                  name: Battery 9 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_10_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_10_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_10_state_of_charge
-                  name: Battery 10 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_11_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_11_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_11_state_of_charge
-                  name: Battery 11 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_12_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_12_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_12_state_of_charge
-                  name: Battery 12 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_13_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_13_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_13_state_of_charge
-                  name: Battery 13 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_14_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_14_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_14_state_of_charge
-                  name: Battery 14 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_15_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_15_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_15_state_of_charge
-                  name: Battery 15 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_16_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_16_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_16_state_of_charge
-                  name: Battery 16 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_17_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_17_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_17_state_of_charge
-                  name: Battery 17 State Of Charge
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_18_state_of_charge
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_18_state_of_charge
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_18_state_of_charge
-                  name: Battery 18 State Of Charge
               - type: divider
               - type: conditional
                 conditions:
@@ -1309,138 +776,406 @@ views:
                 row:
                   entity: sensor.zendure_battery_3_cell_balance_status
                   name: Battery 3 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_4_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_4_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_4_cell_balance_status
-                  name: Battery 4 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_5_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_5_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_5_cell_balance_status
-                  name: Battery 5 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_6_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_6_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_6_cell_balance_status
-                  name: Battery 6 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_7_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_7_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_7_cell_balance_status
-                  name: Battery 7 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_8_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_8_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_8_cell_balance_status
-                  name: Battery 8 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_9_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_9_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_9_cell_balance_status
-                  name: Battery 9 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_10_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_10_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_10_cell_balance_status
-                  name: Battery 10 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_11_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_11_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_11_cell_balance_status
-                  name: Battery 11 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_12_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_12_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_12_cell_balance_status
-                  name: Battery 12 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_13_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_13_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_13_cell_balance_status
-                  name: Battery 13 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_14_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_14_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_14_cell_balance_status
-                  name: Battery 14 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_15_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_15_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_15_cell_balance_status
-                  name: Battery 15 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_16_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_16_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_16_cell_balance_status
-                  name: Battery 16 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_17_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_17_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_17_cell_balance_status
-                  name: Battery 17 Cell Balance
-              - type: conditional
-                conditions:
-                  - entity: sensor.zendure_battery_18_cell_balance_status
-                    state_not: unknown
-                  - entity: sensor.zendure_battery_18_cell_balance_status
-                    state_not: unavailable
-                row:
-                  entity: sensor.zendure_battery_18_cell_balance_status
-                  name: Battery 18 Cell Balance
+      - type: grid
+        cards:
+          - type: heading
+            heading: SOC Diagnostic
+            heading_style: title
+            icon: mdi:scale-balance
+          - type: markdown
+            content: >-
+              Gielz1986's raw combined SOC is a simple average across units, not
+              weighted by capacity. This package computes a corrected weighted
+              value (Real SOC %) used by all reserve/export logic. See the
+              comparison below.
+            text_only: true
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.zendure_true_total_state_of_charge
+                name: Real SOC % (weighted)
+                icon: mdi:battery-medium
+              - entity: sensor.zendure_total_state_of_charge
+                name: Raw SOC % (unweighted)
+              - entity: sensor.zendure_1_state_of_charge
+                name: Unit 1
+              - entity: sensor.zendure_2_state_of_charge
+                name: Unit 2
+  - type: sections
+    max_columns: 4
+    title: Battery Health
+    path: battery-health
+    icon: mdi:battery-heart-variant
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Battery Detail
+            heading_style: title
+            icon: mdi:battery-heart-variant
+          - type: entities
+            entities:
+              - entity: sensor.zendure_set_charge_power
+                name: Charge Power Set
+                icon: mdi:battery-charging
+              - entity: sensor.zendure_set_discharge_power
+                name: Discharge Power Set
+                icon: mdi:battery-minus
+              - entity: sensor.zendure_inverter_max_charge_power
+                name: Max Charge Power
+              - entity: sensor.zendure_inverter_max_discharge_power
+                name: Max Discharge Power
+              - entity: sensor.zendure_minimum_state_of_charge
+                name: Min SOC
+              - entity: sensor.zendure_maximum_state_of_charge
+                name: Max SOC
+              - entity: sensor.zendure_relay_switches_today
+                name: ⚡ Total Switches Today
+                icon: mdi:swap-vertical-bold
+              - entity: sensor.zendure_relay_switches_charging_today
+                name: 🔋 → Charging (from Standby)
+                icon: mdi:battery-plus-variant
+              - entity: sensor.zendure_relay_switches_discharging_today
+                name: 🪫 → Discharging (from Standby)
+                icon: mdi:battery-minus-variant
+          - type: heading
+            heading: Energy Totals
+            heading_style: title
+            icon: mdi:counter
+          - type: entities
+            entities:
+              - entity: sensor.zendure_energy_import
+                name: Total Energy Charged
+              - entity: sensor.zendure_energy_export
+                name: Total Energy Discharged
+              - entity: sensor.zendure_pv_import
+                name: Total PV Through Battery
+              - entity: sensor.zendure_pv_import_daily
+                name: PV Through Battery Today
+  - type: sections
+    max_columns: 2
+    title: History
+    path: history
+    icon: mdi:history
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Power (17h)
+            heading_style: title
+          - type: history-graph
+            title: Battery & Grid
+            hours_to_show: 17
+            entities:
+              - entity: sensor.zendure_charging_mode
+                name: Mode
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
+                name: Grid (P1)
+              - entity: sensor.zendure_power_export
+                name: Battery Discharge
+              - entity: sensor.zendure_power_import
+                name: Battery Charge
+              - entity: sensor.solar_power_ac_now
+                name: Solar
+              - entity: sensor.zendure_true_total_state_of_charge
+                name: SOC %
+      - type: grid
+        cards:
+          - type: heading
+            heading: Power (2h)
+            heading_style: title
+          - type: history-graph
+            title: Battery & Grid (4h)
+            entities:
+              - entity: sensor.zendure_charging_mode
+                name: Mode
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
+                name: Grid (P1)
+              - entity: sensor.zendure_power_export
+                name: Battery Discharge
+              - entity: sensor.zendure_power_import
+                name: Battery Charge
+              - entity: sensor.solar_power_ac_now
+                name: Solar
+              - entity: sensor.zendure_true_total_state_of_charge
+            hours_to_show: 4
+      - type: grid
+        cards:
+          - type: heading
+            heading: SOC & Efficiency
+            heading_style: title
+          - type: history-graph
+            title: SOC & Efficiency (24h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.zendure_true_total_state_of_charge
+                name: SOC %
+              - entity: sensor.zendure_export_efficiency_24h
+                name: Export Efficiency
+              - entity: sensor.zendure_import_efficiency_24h
+                name: Import Efficiency
+      - type: grid
+        cards:
+          - type: heading
+            heading: Connectivity
+            heading_style: title
+          - type: history-graph
+            title: Signal Strength (21h)
+            hours_to_show: 21
+            entities:
+              - entity: sensor.zendure_wifi_signal_strength
+                name: Zendure WiFi
+              - entity: sensor.p1_meter_5c2faf0f7b00_wi_fi_strength
+                name: P1 WiFi
+  - type: sections
+    max_columns: 2
+    subview: true
+    path: releasenotes
+    title: Releasenotes
+    icon: mdi:github
+    sections:
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              **{{ state_attr('sensor.github_zendure_gielz1986', 'tag_name')}}**
+              {{ state_attr('sensor.github_zendure_gielz1986', 'body')}}
+            grid_options:
+              columns: 24
+              rows: auto
+            text_only: true
+        column_span: 2
+    cards: []
+  - type: sections
+    max_columns: 2
+    title: Solar
+    path: solar
+    icon: mdi:solar-power-variant
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Live Distribution
+            heading_style: title
+            icon: mdi:lightning-bolt-circle
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.solar_power_ac_now
+                name: Solar Total
+                icon: mdi:solar-power-variant
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
+                name: Grid (P1)
+                icon: mdi:transmission-tower
+              - entity: sensor.zendure_power_import
+                name: Battery Charge
+                icon: mdi:battery-charging
+          - type: entities
+            entities:
+              - entity: sensor.solax_x1_powerdc1
+                name: X1 DC String 1
+              - entity: sensor.solax_x2_powerdc1
+                name: X2 DC String 1
+              - entity: sensor.inverter_pv_1_voltage
+                name: Huawei PV1 Voltage
+              - entity: sensor.inverter_pv_1_current
+                name: Huawei PV1 Current
+            title: Solardc
+      - type: grid
+        cards:
+          - type: heading
+            heading: Forecast (Forecast.Solar)
+            heading_style: title
+            icon: mdi:weather-partly-cloudy
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.zendure_solar_forecast_tomorrow
+                name: Tomorrow (Combined)
+                icon: mdi:calendar-clock
+              - entity: sensor.energy_production_today
+                name: Huawei Today
+              - entity: sensor.energy_production_today_2
+                name: X1 Today
+              - entity: sensor.energy_production_today_3
+                name: X2 Today
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.energy_current_hour
+                name: Huawei This Hour
+              - entity: sensor.energy_current_hour_2
+                name: X1 This Hour
+              - entity: sensor.energy_current_hour_3
+                name: X2 This Hour
+          - type: entities
+            title: Remaining Today
+            entities:
+              - entity: sensor.energy_production_today_remaining
+                name: Huawei Remaining
+              - entity: sensor.energy_production_today_remaining_2
+                name: X1 Remaining
+              - entity: sensor.energy_production_today_remaining_3
+                name: X2 Remaining
+          - type: entities
+            title: Peak Times
+            entities:
+              - entity: sensor.power_highest_peak_time_today
+                name: Huawei Peak Today
+              - entity: sensor.power_highest_peak_time_today_2
+                name: X1 Peak Today
+              - entity: sensor.power_highest_peak_time_today_3
+                name: X2 Peak Today
+              - entity: sensor.power_highest_peak_time_tomorrow
+                name: Huawei Peak Tomorrow
+              - entity: sensor.power_highest_peak_time_tomorrow_2
+                name: X1 Peak Tomorrow
+              - entity: sensor.power_highest_peak_time_tomorrow_3
+                name: X2 Peak Tomorrow
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="warning">A 4th Forecast.Solar device
+              ("Solar production forecast") exists but doesn't match any of
+              your 3 real systems — all its energy values sit at 0.0, and its
+              peak-time sensors show today's date/current time rather than a
+              real midday peak, which is a sign it's an empty/misconfigured
+              entry. Shown below for reference — it is NOT included in any
+              totals used by the export automation. Worth checking in
+              Forecast.Solar's config whether it can be removed.</ha-alert>
+            text_only: true
+          - type: entities
+            title: "Unmatched 4th Device (not used anywhere)"
+            entities:
+              - entity: sensor.energy_production_today_4
+                name: Today
+              - entity: sensor.energy_production_tomorrow_4
+                name: Tomorrow
+              - entity: sensor.power_highest_peak_time_today_4
+                name: Peak Time Today
+      - type: grid
+        cards:
+          - type: heading
+            heading: History (7 days)
+            heading_style: subtitle
+            icon: mdi:chart-timeline-variant
+          - type: history-graph
+            title: Solar Flow (7d)
+            hours_to_show: 168
+            entities:
+              - entity: sensor.solar_power_ac_now
+                name: Solar
+              - entity: sensor.solar_flow_to_house
+                name: To House
+              - entity: sensor.solar_flow_to_battery
+                name: To Battery
+              - entity: sensor.solar_flow_to_grid
+                name: To Grid
+          - type: history-graph
+            title: Self Consumption % (7d)
+            hours_to_show: 168
+            entities:
+              - entity: sensor.solar_self_consumption_ratio
+                name: Self Consumption %
+  - type: sections
+    max_columns: 3
+    title: P1 Meter
+    path: p1-meter
+    icon: mdi:transmission-tower
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Power
+            heading_style: title
+            icon: mdi:lightning-bolt
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
+                name: Total Power
+                icon: mdi:transmission-tower
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l1
+                name: Phase L1
+                icon: mdi:sine-wave
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l2
+                name: Phase L2
+                icon: mdi:sine-wave
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l3
+                name: Phase L3
+                icon: mdi:sine-wave
+          - type: history-graph
+            title: Active Power (24h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power
+                name: Total
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l1
+                name: L1
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l2
+                name: L2
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_power_l3
+                name: L3
+          - type: markdown
+            content: >
+              <ha-alert alert-type="info"> Voltage and current sensors are
+              **disabled by default** in Home Assistant. Enable them via
+              Settings → Devices & Services → HomeWizard → your P1 meter →
+              entities. </ha-alert>
+            text_only: true
+          - type: heading
+            heading: Voltage & Current
+            heading_style: title
+            icon: mdi:sine-wave
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            entities:
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l1
+                name: Voltage L1
+                icon: mdi:sine-wave
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l2
+                name: Voltage L2
+                icon: mdi:sine-wave
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l3
+                name: Voltage L3
+                icon: mdi:sine-wave
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l1
+                name: Current L1
+                icon: mdi:current-ac
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l2
+                name: Current L2
+                icon: mdi:current-ac
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l3
+                name: Current L3
+                icon: mdi:current-ac
+          - type: history-graph
+            title: Voltage (24h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l1
+                name: L1
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l2
+                name: L2
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_voltage_l3
+                name: L3
+          - type: history-graph
+            title: Current (24h)
+            hours_to_show: 24
+            entities:
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l1
+                name: L1
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l2
+                name: L2
+              - entity: sensor.p1_meter_5c2faf0f7b00_active_current_l3
+                name: L3
