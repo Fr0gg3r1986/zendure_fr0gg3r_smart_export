@@ -14,6 +14,9 @@ Full version history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Disclaimer
 
+- **This is a personal repository.** I built and maintain this to manage my own Zendure setup, and I take full responsibility for the risk to my own hardware in running it. I'm publishing it publicly in case it's useful to others, not as a supported product.
+- **I am not a professional programmer or developer.** This is hobbyist code, written and refined through trial and error on my own system. It may contain bugs, bad practices, or assumptions that don't hold on other setups.
+- **If you choose to use this on your own system, that's entirely at your own risk.** I take no responsibility for how it performs on hardware, integrations, or configurations other than my own.
 - **This project is not affiliated with, endorsed by, or supported by Zendure, Gielz1986, or gast777.** It's an independent, unofficial add-on built by a user, for personal use, and shared publicly as-is.
 - **Use entirely at your own risk.** This code reads from and writes to real battery hardware, and makes automated decisions about grid export based on price and forecast data. Bugs, misconfiguration, upstream API/firmware changes, or incorrect assumptions in this code could result in unexpected battery behavior, financial cost from incorrect export/import decisions, or hardware wear.
 - **No warranty, no liability.** This software is provided "as is," with no guarantee it is fit for any particular purpose. The author accepts **no responsibility or liability whatsoever** for any hardware malfunction, damage, data loss, financial loss, or any other direct or indirect harm arising from installing, configuring, or using this code — see the [LICENSE](LICENSE) for the full legal terms.
