@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.16.1 (2026-08-21)
+# Version: 2.17.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -22,6 +22,18 @@
 # LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.17.0 (2026-08-21)
+#     - Added grid-spike detection/resume timestamps. New
+#       binary_sensor.zendure_grid_spike_raw mirrors the threshold check
+#       with no delay_on/delay_off, purely so the exact moment power drops
+#       back under threshold is knowable. sensor.zendure_grid_spike_resume_estimate
+#       (timestamp) computes when export should resume, using that raw
+#       sensor's last_changed + the clear-window setting — only populated
+#       once the raw reading has actually cleared (still "unknown" while
+#       genuinely spiking, since the cooldown timer hasn't started yet).
+#       input_datetime.zendure_grid_spike_last_detected + a new automation
+#       (smart_export_track_grid_spike_detection) record when each spike
+#       was first detected, so it's visible even after the block clears.
 #   2.16.1 (2026-08-21)
 #     - BUG FIX: binary_sensor.zendure_grid_spike_detected failed config
 #       validation and was never created ("Unknown entity" on the
@@ -165,6 +177,12 @@ input_datetime:
     has_date: false
     has_time: true
     initial: "19:00:00"
+
+  zendure_grid_spike_last_detected:
+    name: Zendure - Grid Spike Last Detected
+    has_date: true
+    has_time: true
+    icon: mdi:flash-alert
 
 input_select:
   zendure_revert_mode:
@@ -453,6 +471,20 @@ template:
           {% set threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
           {{ power > threshold }}
 
+      - name: "Zendure Grid Spike Raw"
+        icon: mdi:flash-outline
+        device_class: problem
+        state: >
+          {# Same threshold check as above, but with NO delay_on/delay_off.
+             Exists purely so we can compute exactly when the cooldown will
+             finish — its last_changed timestamp marks the precise moment
+             power actually dropped back under threshold, which the debounced
+             sensor above can't tell us on its own. Not used for blocking
+             logic directly; not intended to be shown prominently. #}
+          {% set power = states('sensor.smart_export_p1_active_power') | float(0) %}
+          {% set threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
+          {{ power > threshold }}
+
       - name: "Zendure Export Active"
         icon: mdi:transmission-tower-export
         device_class: running
@@ -483,6 +515,25 @@ template:
           {% set x1 = states('sensor.energy_production_tomorrow_2') | float(0) %}
           {% set x2 = states('sensor.energy_production_tomorrow_3') | float(0) %}
           {{ (huawei + x1 + x2) | round(2) }}
+
+      - name: "Zendure Grid Spike Resume Estimate"
+        icon: mdi:timer-sand
+        device_class: timestamp
+        state: >
+          {# Only computable once the raw (undelayed) power reading has
+             actually dropped back under threshold — its last_changed
+             marks the exact moment that happened. While still genuinely
+             spiking (raw sensor still "on"), there's nothing to estimate
+             yet, since the clear-window timer hasn't started counting. #}
+          {% set blocking = is_state('binary_sensor.zendure_grid_spike_detected', 'on') %}
+          {% set still_spiking = is_state('binary_sensor.zendure_grid_spike_raw', 'on') %}
+          {% if blocking and not still_spiking %}
+            {% set cleared_at = states.binary_sensor.zendure_grid_spike_raw.last_changed %}
+            {% set clear_minutes = states('input_number.zendure_grid_spike_clear_minutes') | int(5) %}
+            {{ (cleared_at + timedelta(minutes=clear_minutes)).isoformat() }}
+          {% else %}
+            unknown
+          {% endif %}
 
       # ---------------------------------------------------------------------
       # P1 meter wrapper sensors — dashboard-stable proxy entities.
@@ -854,7 +905,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.16.1"
+        state: "2.17.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -1391,4 +1442,23 @@ automation:
           entity_id: input_number.smart_export_solar_predicted_x2_kwh
         data:
           value: "{{ states('sensor.energy_production_today_3') | float(0) }}"
+    mode: single
+
+  - id: smart_export_track_grid_spike_detection
+    alias: Smart Export - Track Grid Spike Detection Time
+    description: >-
+      Records the timestamp each time a grid spike is newly detected (the
+      debounced sensor turning "on"), so the dashboard can show "last peak
+      detected at" even after the block has since cleared and the sensor
+      has gone back to "off".
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.zendure_grid_spike_detected
+        to: "on"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.zendure_grid_spike_last_detected
+        data:
+          timestamp: "{{ now().timestamp() }}"
     mode: single
