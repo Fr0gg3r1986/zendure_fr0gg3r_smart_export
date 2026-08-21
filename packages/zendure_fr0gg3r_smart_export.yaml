@@ -1,6 +1,6 @@
 # =============================================================================
 # Zendure Smart Export — Price-Aware Evening/Vacation Export Control
-# Version: 2.17.0 (2026-08-21)
+# Version: 2.18.0 (2026-08-21)
 # Author: Fr0gg3r1986
 # https://github.com/Fr0gg3r1986/zendure-smart-export
 #
@@ -22,6 +22,27 @@
 # LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.18.0 (2026-08-21)
+#     - Grid spike detection now catches heavy loads the battery silently
+#       absorbs during export (e.g. a non-smart stove/oven), which the
+#       grid-only check missed since the meter never crosses into import —
+#       the fixed-rate Quick Discharge just eats the extra draw, shrinking
+#       export instead of showing up as import.
+#     - Added a second, independent trigger: home load (sensor.solar_used_now,
+#       from packages/solar_sensors.yaml) jumping above a slowly-updating
+#       baseline (input_number.zendure_home_load_baseline_w, refreshed every
+#       minute ONLY while calm via new automation
+#       smart_export_update_home_load_baseline) by more than
+#       input_number.zendure_home_load_jump_threshold_w (default 400W).
+#       Either the existing grid-import check OR this one trips the same
+#       binary_sensor.zendure_grid_spike_detected — no other logic,
+#       automation gating, or dashboard entity needed to change.
+#     - Added sensor.zendure_grid_spike_source (diagnostic text) showing
+#       which check actually tripped: Grid Import / Home Load Jump / both.
+#     - Graceful degradation: if sensor.solar_used_now isn't available (the
+#       solar_sensors.yaml package not installed), the home-load check
+#       simply never trips and grid-based detection works exactly as
+#       before — no error, no missing dependency issue.
 #   2.17.0 (2026-08-21)
 #     - Added grid-spike detection/resume timestamps. New
 #       binary_sensor.zendure_grid_spike_raw mirrors the threshold check
@@ -356,6 +377,24 @@ input_number:
     unit_of_measurement: "min"
     icon: mdi:timer-check-outline
 
+  zendure_home_load_baseline_w:
+    name: Zendure - Home Load Baseline
+    min: 0
+    max: 5000
+    step: 1
+    initial: 0
+    unit_of_measurement: "W"
+    mode: box
+    icon: mdi:home-lightning-bolt-outline
+  zendure_home_load_jump_threshold_w:
+    name: Zendure - Home Load Jump Threshold
+    min: 0
+    max: 3000
+    step: 50
+    initial: 400
+    unit_of_measurement: "W"
+    icon: mdi:home-alert-outline
+
 input_boolean:
   zendure_export_armed:
     name: Zendure - Allow price-based export (I'm away)
@@ -459,31 +498,47 @@ template:
         delay_on: "{{ states('input_number.zendure_grid_spike_entry_seconds') | int(15) }}"
         delay_off: "{{ (states('input_number.zendure_grid_spike_clear_minutes') | int(5)) * 60 }}"
         state: >
-          {# Catches sudden heavy grid draw (e.g. non-smart electric stove,
-             or any large appliance) while exporting. Uses the P1 wrapper
-             sensor so it works regardless of your actual meter's entity ID.
-             delay_on = must stay above threshold this long before blocking
-             (ignores brief transients). delay_off = must stay below
-             threshold continuously this long before resuming export
-             (rides through a heating element's normal on/off cycling
-             instead of flapping the mode every time it cycles off). #}
+          {# Catches sudden heavy consumption from ANY appliance, smart or
+             not, whether or not it shows up on the grid meter. Two
+             independent checks, either one trips this:
+             1) Grid import above threshold — catches spikes while NOT
+                exporting (nothing to absorb the load).
+             2) Home load jumping above its own recent baseline — catches
+                spikes while exporting, when the battery's fixed discharge
+                rate simply absorbs the extra draw and the grid meter never
+                moves into positive territory. Uses sensor.solar_used_now
+                (corrected home-load calc from packages/solar_sensors.yaml —
+                optional; if that sensor doesn't exist, this check just
+                never trips and grid-based detection alone still works).
+             delay_on/delay_off as described in Zendure Grid Spike Raw
+             below. #}
           {% set power = states('sensor.smart_export_p1_active_power') | float(0) %}
-          {% set threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
-          {{ power > threshold }}
+          {% set grid_threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
+          {% set grid_spike = power > grid_threshold %}
+          {% set home_load = states('sensor.solar_used_now') | float(0) %}
+          {% set baseline = states('input_number.zendure_home_load_baseline_w') | float(0) %}
+          {% set jump_threshold = states('input_number.zendure_home_load_jump_threshold_w') | float(400) %}
+          {% set load_spike = (home_load - baseline) > jump_threshold %}
+          {{ grid_spike or load_spike }}
 
       - name: "Zendure Grid Spike Raw"
         icon: mdi:flash-outline
         device_class: problem
         state: >
-          {# Same threshold check as above, but with NO delay_on/delay_off.
+          {# Same combined check as above, but with NO delay_on/delay_off.
              Exists purely so we can compute exactly when the cooldown will
              finish — its last_changed timestamp marks the precise moment
-             power actually dropped back under threshold, which the debounced
-             sensor above can't tell us on its own. Not used for blocking
-             logic directly; not intended to be shown prominently. #}
+             BOTH conditions cleared, which the debounced sensor above
+             can't tell us on its own. Not used for blocking logic
+             directly; not intended to be shown prominently. #}
           {% set power = states('sensor.smart_export_p1_active_power') | float(0) %}
-          {% set threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
-          {{ power > threshold }}
+          {% set grid_threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
+          {% set grid_spike = power > grid_threshold %}
+          {% set home_load = states('sensor.solar_used_now') | float(0) %}
+          {% set baseline = states('input_number.zendure_home_load_baseline_w') | float(0) %}
+          {% set jump_threshold = states('input_number.zendure_home_load_jump_threshold_w') | float(400) %}
+          {% set load_spike = (home_load - baseline) > jump_threshold %}
+          {{ grid_spike or load_spike }}
 
       - name: "Zendure Export Active"
         icon: mdi:transmission-tower-export
@@ -533,6 +588,28 @@ template:
             {{ (cleared_at + timedelta(minutes=clear_minutes)).isoformat() }}
           {% else %}
             unknown
+          {% endif %}
+
+      - name: "Zendure Grid Spike Source"
+        icon: mdi:magnify-scan
+        state: >
+          {# Diagnostic — shows WHICH check tripped the spike sensor, since
+             it's now watching two independent things. #}
+          {% set power = states('sensor.smart_export_p1_active_power') | float(0) %}
+          {% set grid_threshold = states('input_number.zendure_grid_spike_threshold_w') | float(300) %}
+          {% set grid_spike = power > grid_threshold %}
+          {% set home_load = states('sensor.solar_used_now') | float(0) %}
+          {% set baseline = states('input_number.zendure_home_load_baseline_w') | float(0) %}
+          {% set jump_threshold = states('input_number.zendure_home_load_jump_threshold_w') | float(400) %}
+          {% set load_spike = (home_load - baseline) > jump_threshold %}
+          {% if grid_spike and load_spike %}
+            Grid Import + Home Load Jump
+          {% elif grid_spike %}
+            Grid Import
+          {% elif load_spike %}
+            Home Load Jump (absorbed by battery)
+          {% else %}
+            Clear
           {% endif %}
 
       # ---------------------------------------------------------------------
@@ -905,7 +982,7 @@ template:
 
       - name: "Zendure Package Version"
         icon: mdi:tag-outline
-        state: "2.17.0"
+        state: "2.18.0"
 
       - name: "Zendure True Total State Of Charge"
         icon: mdi:battery-sync-outline
@@ -1461,4 +1538,30 @@ automation:
           entity_id: input_datetime.zendure_grid_spike_last_detected
         data:
           timestamp: "{{ now().timestamp() }}"
+    mode: single
+
+  - id: smart_export_update_home_load_baseline
+    alias: Smart Export - Update Home Load Baseline
+    description: >-
+      Refreshes the "normal" home load reference point every minute, but
+      ONLY while no spike is currently blocking — so a spike itself never
+      gets baked into its own baseline. During a spike, the baseline stays
+      frozen at its last known calm value, keeping the jump comparison
+      meaningful throughout. Requires sensor.solar_used_now (corrected
+      home-load calc, packages/solar_sensors.yaml) — if that sensor doesn't
+      exist, this just keeps writing 0 and the home-load-jump check simply
+      never trips; grid-based detection is unaffected either way.
+    trigger:
+      - platform: time_pattern
+        minutes: 1
+    condition:
+      - condition: state
+        entity_id: binary_sensor.zendure_grid_spike_detected
+        state: "off"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.zendure_home_load_baseline_w
+        data:
+          value: "{{ states('sensor.solar_used_now') | float(0) }}"
     mode: single
