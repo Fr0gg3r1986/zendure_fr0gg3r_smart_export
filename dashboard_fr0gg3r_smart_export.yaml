@@ -22,6 +22,11 @@
 # outcome on your own system. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.19.0
+#     - Added a "Grid Spike Blocking" tile to Export Control, and a new
+#       "Grid Spike Settings" section on Export Settings: current grid
+#       power, spike threshold, entry delay, clear window, live block
+#       status. Companion to package v2.16.0's grid-spike export block.
 #   2.18.0
 #     - Added a "Disclaimer" view: the full README disclaimer rendered as
 #       alert cards directly in the dashboard UI, not just in YAML comments.
@@ -212,7 +217,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.18.0 · by Fr0gg3r1986
+              Dashboard v2.19.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -239,6 +244,10 @@ views:
               - type: tile
                 entity: binary_sensor.zendure_low_solar_tomorrow
                 name: Low Solar Blocking
+                vertical: false
+              - type: tile
+                entity: binary_sensor.zendure_grid_spike_detected
+                name: Grid Spike Blocking
                 vertical: false
           - type: button
             name: Force Stop Export Now
@@ -546,6 +555,34 @@ views:
                 name: Currently Blocking?
               - entity: input_boolean.zendure_ignore_low_solar_forecast
                 name: Ignore Today (Override)
+      - type: grid
+        cards:
+          - type: heading
+            heading: Grid Spike Settings
+            heading_style: title
+            icon: mdi:flash-alert
+          - type: markdown
+            content: >-
+              <ha-alert alert-type="info">Stops export the moment grid draw
+              spikes above threshold — catches any heavy appliance, smart or
+              not (e.g. a non-smart electric stove), since it watches the
+              meter rather than individual devices. Entry Delay ignores
+              brief transients; Clear Window rides through an appliance's
+              normal heating-element on/off cycling so it doesn't flap the
+              mode every time the load dips briefly.</ha-alert>
+            text_only: true
+          - type: entities
+            entities:
+              - entity: sensor.smart_export_p1_active_power
+                name: Current Grid Power
+              - entity: input_number.zendure_grid_spike_threshold_w
+                name: Spike Threshold
+              - entity: input_number.zendure_grid_spike_entry_seconds
+                name: Entry Delay
+              - entity: input_number.zendure_grid_spike_clear_minutes
+                name: Clear Window
+              - entity: binary_sensor.zendure_grid_spike_detected
+                name: Currently Blocking?
       - type: grid
         cards:
           - type: heading
