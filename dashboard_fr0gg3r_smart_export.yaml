@@ -22,6 +22,25 @@
 # outcome on your own system. Full legal terms: see LICENSE (MIT) in the repo.
 #
 # Changelog:
+#   2.22.0
+#     - Added "Last Peak Detected" and "Export Resumes At" fields, plus a
+#       24h Logbook history card, to Tablet Overview right after the Grid
+#       Power vs Spike Threshold chart. Companion to package v2.17.0's
+#       grid-spike detection/resume timestamp tracking.
+#   2.21.0
+#     - Added a "Grid Power vs Spike Threshold (2h)" chart to Tablet
+#       Overview, right after the blocking-factor tiles: grid power as a
+#       filled area, spike threshold as a red stepline, so a spike crossing
+#       the threshold is immediately visible. Short 2h window chosen since
+#       spikes are short-duration events that'd be invisible on a longer
+#       span. Companion to package v2.16.1's grid-spike detection.
+#   2.20.0
+#     - Added a "Tablet Overview" view: a large, glanceable single-screen
+#       status board — Real SOC gauge, charging mode, per-unit SOC/power,
+#       export active/armed/current mode tiles, top-price status, all 3
+#       blocking-factor tiles (aircon/low-solar/grid-spike) side by side,
+#       and grid/solar/home-use at a glance. Designed for a wall-mounted
+#       tablet in kiosk mode pointed at this view's path.
 #   2.19.0
 #     - Added a "Grid Spike Blocking" tile to Export Control, and a new
 #       "Grid Spike Settings" section on Export Settings: current grid
@@ -217,7 +236,7 @@ views:
           - type: markdown
             content: >-
               Package v{{ states('sensor.zendure_package_version') }} ·
-              Dashboard v2.19.0 · by Fr0gg3r1986
+              Dashboard v2.22.0 · by Fr0gg3r1986
             text_only: true
   - type: sections
     max_columns: 2
@@ -1419,4 +1438,211 @@ views:
             content: >-
               Full source, README, and license:
               [github.com/Fr0gg3r1986/zendure-smart-export](https://github.com/Fr0gg3r1986/zendure-smart-export)
+            text_only: true
+  - type: sections
+    max_columns: 4
+    title: Tablet Overview
+    path: tablet-overview
+    icon: mdi:tablet-dashboard
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Battery
+            heading_style: title
+            icon: mdi:battery-high
+          - type: gauge
+            entity: sensor.zendure_true_total_state_of_charge
+            name: Real SOC
+            min: 0
+            max: 100
+            needle: true
+            grid_options:
+              columns: 6
+              rows: 3
+            severity:
+              red: 0
+              yellow: 30
+              green: 50
+          - type: tile
+            entity: sensor.zendure_charging_mode
+            name: Charging Mode
+            vertical: true
+            grid_options:
+              columns: 6
+              rows: 3
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            grid_options:
+              columns: 12
+              rows: 2
+            entities:
+              - entity: sensor.zendure_1_state_of_charge
+                name: Unit 1 SOC
+              - entity: sensor.zendure_1_power
+                name: Unit 1 Power
+              - entity: sensor.zendure_2_state_of_charge
+                name: Unit 2 SOC
+              - entity: sensor.zendure_2_power
+                name: Unit 2 Power
+              - entity: sensor.zendure_power_export
+                name: Discharge
+              - entity: sensor.zendure_power_import
+                name: Charge
+      - type: grid
+        cards:
+          - type: heading
+            heading: Export Status
+            heading_style: title
+            icon: mdi:home-export-outline
+          - type: tile
+            entity: binary_sensor.zendure_export_active
+            name: Exporting Now?
+            vertical: true
+            grid_options:
+              columns: 6
+              rows: 3
+          - type: tile
+            entity: input_boolean.zendure_export_armed
+            name: Armed?
+            vertical: true
+            grid_options:
+              columns: 6
+              rows: 3
+          - type: tile
+            entity: input_select.zendure_operation_mode
+            name: Current Mode (Gielz)
+            vertical: true
+            grid_options:
+              columns: 6
+              rows: 3
+          - type: tile
+            entity: sensor.dynamic_highest_price_period
+            name: Top Price Now?
+            vertical: true
+            grid_options:
+              columns: 6
+              rows: 3
+          - type: entities
+            entities:
+              - entity: sensor.zendure_export_reason
+                name: Reason
+              - entity: sensor.zendure_next_mode_flip
+                name: Next Mode Flip
+              - entity: sensor.zendure_next_export_window
+                name: Next Export Window
+      - type: grid
+        cards:
+          - type: heading
+            heading: Blocking Factors
+            heading_style: title
+            icon: mdi:block-helper
+          - type: tile
+            entity: binary_sensor.zendure_aircon_reserve_needed
+            name: Aircon Blocking
+            vertical: true
+            grid_options:
+              columns: 4
+              rows: 3
+          - type: tile
+            entity: binary_sensor.zendure_low_solar_tomorrow
+            name: Low Solar Blocking
+            vertical: true
+            grid_options:
+              columns: 4
+              rows: 3
+          - type: tile
+            entity: binary_sensor.zendure_grid_spike_detected
+            name: Grid Spike Blocking
+            vertical: true
+            grid_options:
+              columns: 4
+              rows: 3
+          - type: custom:apexcharts-card
+            graph_span: 2h
+            header:
+              show: true
+              title: Grid Power vs Spike Threshold (2h)
+              show_states: false
+            apex_config:
+              chart:
+                height: 220px
+              legend:
+                show: true
+              yaxis:
+                - decimalsInFloat: 0
+                  labels:
+                    style:
+                      colors: >-
+                        color-mix(in srgb, var(--primary-text-color) 75%,
+                        transparent)
+              tooltip:
+                x:
+                  format: HH:mm
+                  show: false
+              grid:
+                show: true
+                borderColor: color-mix(in srgb, var(--divider-color) 50%, transparent)
+                strokeDashArray: 0
+            series:
+              - entity: sensor.smart_export_p1_active_power
+                name: Grid Power
+                type: area
+                stroke_width: 2
+                opacity: 0.25
+                extend_to: now
+                float_precision: 0
+                color: "#44739e"
+              - entity: input_number.zendure_grid_spike_threshold_w
+                name: Spike Threshold
+                type: line
+                stroke_width: 2
+                curve: stepline
+                extend_to: now
+                float_precision: 0
+                color: "#c53b2c"
+                opacity: 1
+          - type: entities
+            entities:
+              - entity: input_datetime.zendure_grid_spike_last_detected
+                name: Last Peak Detected
+              - entity: sensor.zendure_grid_spike_resume_estimate
+                name: Export Resumes At
+          - type: logbook
+            title: Peak Detection History
+            hours_to_show: 24
+            grid_options:
+              columns: 12
+              rows: 6
+            entities:
+              - binary_sensor.zendure_grid_spike_detected
+      - type: grid
+        cards:
+          - type: heading
+            heading: Grid & Solar
+            heading_style: title
+            icon: mdi:transmission-tower
+          - type: glance
+            show_name: true
+            show_icon: true
+            show_state: true
+            grid_options:
+              columns: 12
+              rows: 2
+            entities:
+              - entity: sensor.smart_export_p1_active_power
+                name: Grid (P1)
+                icon: mdi:transmission-tower
+              - entity: sensor.solar_power_ac_now
+                name: Solar
+                icon: mdi:solar-power-variant
+              - entity: sensor.solar_used_now
+                name: Home Use
+                icon: mdi:home-lightning-bolt-outline
+          - type: markdown
+            content: >-
+              Package v{{ states('sensor.zendure_package_version') }} ·
+              Dashboard v2.22.0 · by Fr0gg3r1986
             text_only: true
