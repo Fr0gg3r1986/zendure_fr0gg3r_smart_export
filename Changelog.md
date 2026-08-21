@@ -1,5 +1,7 @@
 # Changelog
 
+> **Disclaimer:** This is a personal, hobbyist project — see the [README](README.md#disclaimer) for the full disclaimer. Not affiliated with Zendure, Gielz1986, or gast777. Use at your own risk.
+
 All notable changes to Zendure Fr0gg3r Smart Export are documented here. The package and dashboard are versioned independently (they don't always ship together).
 
 ## Package (`zendure_fr0gg3r_smart_export.yaml`)
